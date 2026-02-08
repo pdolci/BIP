@@ -1,5 +1,4 @@
 import logging
-import os
 import datetime
 from flask_mail import Message
 from extensions import mail, db
@@ -48,7 +47,7 @@ def read_file_chunk(file_path, start_idx, length):
 
             # Ensure the chunk ends at the end of a sentence
             sentence_endings = {'.', '!', '?'}
-            while new_index < len(words) and not words[new_index - 1][-1] in sentence_endings:
+            while new_index < len(words) and words[new_index - 1][-1] not in sentence_endings:
                 chunk_words.append(words[new_index])
                 new_index += 1
 
@@ -82,7 +81,7 @@ def send_next_book_part(schedule_id):
     user = User.query.get(schedule.user_id)
 
     if not book or not user:
-        logging.error(f"⚠️ Errore: Nessun libro o utente trovato")
+        logging.error("⚠️ Errore: Nessun libro o utente trovato")
         return
 
     file_path = book.get_absolute_path()  # Use method to get path
