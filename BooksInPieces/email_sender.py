@@ -87,7 +87,6 @@ def extract_html_chunk(content, start_idx, length):
     sentence_end = re.compile(r"[.!?][\"')\]]?$")
     current_word_index = 0
     chunk_word_count = 0
-    chunk_plain_words = []
     output_tokens = []
     active_tags = []
     started = False
@@ -109,22 +108,21 @@ def extract_html_chunk(content, start_idx, length):
                 output_tokens.append(token)
             continue
 
-        words = token.split()
-        if not words:
+        word_matches = list(re.finditer(r"\S+", token))
+        if not word_matches:
             if started and not finished:
                 output_tokens.append(token)
             continue
 
         token_start = current_word_index
-        token_end = current_word_index + len(words)
+        token_end = current_word_index + len(word_matches)
         current_word_index = token_end
 
         if token_end <= start_idx:
             continue
 
         relative_start = max(0, start_idx - token_start)
-        selected_words = words[relative_start:]
-        if not selected_words:
+        if relative_start >= len(word_matches):
             continue
 
         if not started:
@@ -132,22 +130,24 @@ def extract_html_chunk(content, start_idx, length):
             for tag in active_tags:
                 output_tokens.append(f"<{tag}>")
 
-        kept_words = []
-        for word in selected_words:
-            kept_words.append(word)
-            chunk_plain_words.append(word)
+        selected_start_char = word_matches[relative_start].start()
+        selected_end_char = len(token)
+
+        for match in word_matches[relative_start:]:
+            word = match.group(0)
             chunk_word_count += 1
+            selected_end_char = match.end()
 
             if chunk_word_count >= length and sentence_end.search(word):
                 finished = True
                 break
 
-        output_tokens.append(" ".join(kept_words))
+        output_tokens.append(token[selected_start_char:selected_end_char])
 
         if finished:
             break
 
-    if not chunk_plain_words:
+    if chunk_word_count == 0:
         return None, start_idx
 
     new_index = start_idx + chunk_word_count
@@ -157,7 +157,7 @@ def extract_html_chunk(content, start_idx, length):
         for tag in reversed(active_tags):
             chunk_html += f"</{tag}>"
 
-    return ContentChunk(plain_text=" ".join(chunk_plain_words), html_content=chunk_html), new_index
+    return ContentChunk(plain_text=html_to_text(chunk_html), html_content=chunk_html), new_index
 
 
 def detect_encoding(file_path):
@@ -187,25 +187,26 @@ def read_file_chunk(file_path, start_idx, length):
                 return chunk, new_index, source_is_html
 
             readable_content = source_content
-            words = readable_content.split()
+            words = list(re.finditer(r"\S+", readable_content))
             
             if start_idx >= len(words):  # Check if start index exceeds word count
                 logging.info("⚠️ Nessun altro testo da inviare, fine della lettura.")
                 return None, start_idx, source_is_html
 
             # Extract the required number of words
-            chunk_words = words[start_idx:start_idx + length]
-            new_index = start_idx + length
+            end_word_index = min(start_idx + length, len(words))
 
             # Ensure the chunk ends at the end of a sentence
-            sentence_endings = {'.', '!', '?'}
-            while new_index < len(words) and words[new_index - 1][-1] not in sentence_endings:
-                chunk_words.append(words[new_index])
-                new_index += 1
+            sentence_end = re.compile(r"[.!?][\"')\]]?$")
+            while end_word_index < len(words) and not sentence_end.search(words[end_word_index - 1].group(0)):
+                end_word_index += 1
 
-            chunk_text = " ".join(chunk_words)
+            chunk_start_char = words[start_idx].start()
+            chunk_end_char = words[end_word_index - 1].end()
+            chunk_text = readable_content[chunk_start_char:chunk_end_char].strip()
+            new_index = end_word_index
             
-            logging.info(f"📖 Chunk letto ({len(chunk_words)} parole): {chunk_text[:100]}...")  # Anteprima primo pezzo
+            logging.info(f"📖 Chunk letto ({new_index - start_idx} parole): {chunk_text[:100]}...")  # Anteprima primo pezzo
             
             return ContentChunk(plain_text=chunk_text), new_index, source_is_html
     except Exception as e:
