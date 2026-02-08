@@ -2,6 +2,7 @@ import logging
 import datetime
 import html
 import re
+from dataclasses import dataclass
 from flask_mail import Message
 from extensions import mail, db
 from models import ReadingSchedule, Book, User
@@ -27,6 +28,12 @@ def is_html_file(file_path):
     return file_path.lower().endswith((".html", ".htm"))
 
 
+@dataclass
+class ContentChunk:
+    plain_text: str
+    html_content: str | None = None
+
+
 def html_to_text(content):
     """Converte un contenuto HTML in testo leggibile."""
     content = re.sub(r"<script.*?>.*?</script>", "", content, flags=re.IGNORECASE | re.DOTALL)
@@ -37,13 +44,14 @@ def html_to_text(content):
     return re.sub(r"\n\s*\n+", "\n\n", content).strip()
 
 
-def build_email_bodies(chunk_text, is_html_source=False):
+def build_email_bodies(chunk, is_html_source=False):
     """Genera corpo testo e corpo HTML per l'email."""
-    plain_text = html_to_text(chunk_text) if is_html_source else chunk_text.strip()
+    plain_text = chunk.plain_text.strip() if isinstance(chunk, ContentChunk) else str(chunk).strip()
 
     if is_html_source:
-        cleaned_html = re.sub(r"<script.*?>.*?</script>", "", chunk_text, flags=re.IGNORECASE | re.DOTALL)
-        html_body = f"<div style='font-family: Arial, sans-serif; line-height: 1.6;'>{cleaned_html}</div>"
+        raw_html = chunk.html_content if isinstance(chunk, ContentChunk) else str(chunk)
+        cleaned_html = re.sub(r"<script.*?>.*?</script>", "", raw_html, flags=re.IGNORECASE | re.DOTALL)
+        html_body = cleaned_html
     else:
         escaped_text = html.escape(plain_text).replace("\n", "<br>")
         html_body = (
@@ -53,6 +61,104 @@ def build_email_bodies(chunk_text, is_html_source=False):
         )
 
     return plain_text, html_body
+
+
+def _tag_name(tag_token):
+    match = re.match(r"<\s*/?\s*([a-zA-Z0-9:-]+)", tag_token)
+    return match.group(1).lower() if match else None
+
+
+def _is_closing_tag(tag_token):
+    return bool(re.match(r"<\s*/", tag_token))
+
+
+def _is_self_closing_tag(tag_token):
+    tag_name = _tag_name(tag_token)
+    if not tag_name:
+        return True
+    if tag_token.rstrip().endswith("/>"):
+        return True
+    return tag_name in {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"}
+
+
+def extract_html_chunk(content, start_idx, length):
+    """Estrae un frammento HTML mantenendo la struttura del markup originale."""
+    tokens = re.findall(r"<[^>]+>|[^<]+", content)
+    sentence_end = re.compile(r"[.!?][\"')\]]?$")
+    current_word_index = 0
+    chunk_word_count = 0
+    chunk_plain_words = []
+    output_tokens = []
+    active_tags = []
+    started = False
+    finished = False
+
+    for token in tokens:
+        if token.startswith("<"):
+            tag = _tag_name(token)
+            if tag and not _is_self_closing_tag(token):
+                if _is_closing_tag(token):
+                    if tag in active_tags:
+                        active_tags.reverse()
+                        active_tags.remove(tag)
+                        active_tags.reverse()
+                else:
+                    active_tags.append(tag)
+
+            if started and not finished:
+                output_tokens.append(token)
+            continue
+
+        words = token.split()
+        if not words:
+            if started and not finished:
+                output_tokens.append(token)
+            continue
+
+        token_start = current_word_index
+        token_end = current_word_index + len(words)
+        current_word_index = token_end
+
+        if token_end <= start_idx:
+            continue
+
+        relative_start = max(0, start_idx - token_start)
+        selected_words = words[relative_start:]
+        if not selected_words:
+            continue
+
+        if not started:
+            started = True
+            for tag in active_tags:
+                output_tokens.append(f"<{tag}>")
+
+        kept_words = []
+        for word in selected_words:
+            kept_words.append(word)
+            chunk_plain_words.append(word)
+            chunk_word_count += 1
+
+            if chunk_word_count >= length and sentence_end.search(word):
+                finished = True
+                break
+
+        output_tokens.append(" ".join(kept_words))
+
+        if finished:
+            break
+
+    if not chunk_plain_words:
+        return None, start_idx
+
+    new_index = start_idx + chunk_word_count
+    chunk_html = "".join(output_tokens)
+
+    if started:
+        for tag in reversed(active_tags):
+            chunk_html += f"</{tag}>"
+
+    return ContentChunk(plain_text=" ".join(chunk_plain_words), html_content=chunk_html), new_index
+
 
 def detect_encoding(file_path):
     """ Rileva la codifica del file per evitare errori di lettura. """
@@ -71,7 +177,16 @@ def read_file_chunk(file_path, start_idx, length):
 
             source_content = file.read()
             source_is_html = is_html_file(file_path)
-            readable_content = html_to_text(source_content) if source_is_html else source_content
+            if source_is_html:
+                chunk, new_index = extract_html_chunk(source_content, start_idx, length)
+                if chunk is None:
+                    logging.info("⚠️ Nessun altro testo da inviare, fine della lettura.")
+                    return None, start_idx, source_is_html
+
+                logging.info(f"📖 Chunk HTML letto ({len(chunk.plain_text.split())} parole): {chunk.plain_text[:100]}...")
+                return chunk, new_index, source_is_html
+
+            readable_content = source_content
             words = readable_content.split()
             
             if start_idx >= len(words):  # Check if start index exceeds word count
@@ -92,7 +207,7 @@ def read_file_chunk(file_path, start_idx, length):
             
             logging.info(f"📖 Chunk letto ({len(chunk_words)} parole): {chunk_text[:100]}...")  # Anteprima primo pezzo
             
-            return chunk_text, new_index, source_is_html
+            return ContentChunk(plain_text=chunk_text), new_index, source_is_html
     except Exception as e:
         logging.error(f"❌ Errore nella lettura del file {file_path}: {e}")
         return None, start_idx, False
