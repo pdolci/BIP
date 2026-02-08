@@ -1,0 +1,26 @@
+/* Stile generale */
+body {
+    background-color: #e3f2fd; /* Azzurro chiaro */
+}
+.navbar {
+    background-color: #00796b; /* Verde scuro */
+}
+.navbar-brand, .nav-link {
+    color: white !important;
+}
+.container {
+    max-width: 900px;
+}
+.btn-primary {
+    background-color: #0288d1; /* Azzurro più scuro */
+    border-color: #0277bd;
+}
+.btn-primary:hover {
+    background-color: #01579b;
+}
+.btn-danger {
+    background-color: #d32f2f;
+}
+.btn-warning {
+    background-color: #ffa000;
+}

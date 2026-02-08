@@ -1,0 +1,153 @@
+/* Stile generale */
+body {
+    font-family: Arial, sans-serif;
+    background: linear-gradient(to bottom, #E0F7FA, #0288D1);
+    color: #fff;
+    text-align: center;
+    margin: 0;
+    padding: 0;
+}
+
+/* Navbar */
+.navbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #01579B;
+    padding: 15px;
+    box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.3);
+}
+
+.logo a {
+    text-decoration: none;
+    color: white;
+    font-size: 24px;
+    font-weight: bold;
+}
+
+.search-bar input {
+    padding: 8px;
+    border: none;
+    border-radius: 20px;
+    width: 200px;
+    font-size: 14px;
+}
+
+.search-bar button {
+    background: #0288D1;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 50%;
+    cursor: pointer;
+    color: white;
+}
+
+/* Link di navigazione */
+.nav-links a {
+    color: white;
+    text-decoration: none;
+    margin: 0 10px;
+    padding: 8px 15px;
+    background: #0277BD;
+    border-radius: 5px;
+    transition: 0.3s;
+}
+
+.nav-links a:hover {
+    background: #039BE5;
+}
+
+/* Titolo principale */
+.main-title {
+    font-size: 36px;
+    margin-top: 30px;
+    text-shadow: 2px 2px 10px rgba(0, 0, 0, 0.2);
+}
+
+/* Container dei libri */
+.books-container {
+    background: rgba(255, 255, 255, 0.2);
+    padding: 20px;
+    margin: 20px auto;
+    width: 80%;
+    border-radius: 10px;
+}
+
+/* Griglia libri */
+.books-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    padding: 10px;
+}
+
+/* Card dei libri */
+.book-card {
+    background: white;
+    color: #01579B;
+    padding: 15px;
+    border-radius: 10px;
+    box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2);
+    transition: transform 0.3s ease-in-out;
+}
+
+.book-card:hover {
+    transform: scale(1.05);
+}
+
+/* Pulsanti */
+.buy-btn {
+    background: #0277BD;
+    color: white;
+    padding: 10px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: 0.3s;
+}
+
+.buy-btn:hover {
+    background: #039BE5;
+}
+
+/* Hero Section */
+.hero {
+    text-align: center;
+    padding: 40px 20px;
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.hero-img {
+    width: 100%;
+    max-height: 300px;
+    object-fit: cover;
+    border-radius: 10px;
+}
+
+.main-title {
+    font-size: 40px;
+    margin: 20px 0 10px;
+}
+
+.subtitle {
+    font-size: 18px;
+    color: #E1F5FE;
+}
+
+/* Contenitore libri */
+.books-container {
+    background: rgba(255, 255, 255, 0.2);
+    padding: 30px;
+    margin: 40px auto;
+    width: 80%;
+    border-radius: 10px;
+}
+
+/* Copertina libro */
+.book-cover {
+    width: 100%;
+    height: 250px;
+    object-fit: cover;
+    border-radius: 5px;
+    margin-bottom: 10px;
+}
