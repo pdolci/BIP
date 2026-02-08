@@ -1,26 +1,99 @@
-/* Stile generale */
+:root {
+    --brand-primary: #1f3c88;
+    --brand-accent: #2b6cb0;
+    --bg-soft: #f4f7fb;
+    --text-main: #1f2937;
+}
+
 body {
-    background-color: #e3f2fd; /* Azzurro chiaro */
+    background: linear-gradient(135deg, #eef4ff 0%, #f8fbff 45%, #edf6ff 100%);
+    color: var(--text-main);
+    font-family: "Inter", "Segoe UI", Roboto, Arial, sans-serif;
+    min-height: 100vh;
 }
-.navbar {
-    background-color: #00796b; /* Verde scuro */
+
+.app-navbar {
+    background: rgba(31, 60, 136, 0.95);
+    backdrop-filter: blur(4px);
 }
-.navbar-brand, .nav-link {
-    color: white !important;
+
+.navbar-brand {
+    font-weight: 700;
+    letter-spacing: 0.3px;
 }
-.container {
-    max-width: 900px;
+
+.nav-link {
+    color: rgba(255, 255, 255, 0.9) !important;
+    font-weight: 500;
 }
+
+.nav-link:hover {
+    color: #ffffff !important;
+}
+
+.hero-panel {
+    border-radius: 20px;
+    background-image: linear-gradient(rgba(16, 35, 79, 0.68), rgba(16, 35, 79, 0.68)),
+        url("https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?auto=format&fit=crop&w=1600&q=80");
+    background-size: cover;
+    background-position: center;
+    color: #fff;
+    padding: 4rem 2rem;
+}
+
+.hero-panel .badge {
+    background: rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+}
+
+.stat-card,
+.book-card,
+.auth-card,
+.panel-card {
+    border: none;
+    border-radius: 16px;
+    box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+}
+
+.stat-card {
+    background: #fff;
+}
+
+.book-card img {
+    height: 220px;
+    object-fit: cover;
+}
+
+.book-card .card-title {
+    font-weight: 700;
+}
+
 .btn-primary {
-    background-color: #0288d1; /* Azzurro più scuro */
-    border-color: #0277bd;
+    background: var(--brand-accent);
+    border-color: var(--brand-accent);
 }
+
 .btn-primary:hover {
-    background-color: #01579b;
+    background: var(--brand-primary);
+    border-color: var(--brand-primary);
 }
-.btn-danger {
-    background-color: #d32f2f;
+
+.form-control,
+.form-select {
+    border-radius: 10px;
+    border: 1px solid #dbe4f0;
 }
-.btn-warning {
-    background-color: #ffa000;
+
+.form-control:focus,
+.form-select:focus {
+    border-color: #7aa9e6;
+    box-shadow: 0 0 0 0.2rem rgba(66, 153, 225, 0.2);
+}
+
+.auth-wrapper {
+    min-height: 78vh;
+}
+
+.section-title {
+    font-weight: 700;
 }
