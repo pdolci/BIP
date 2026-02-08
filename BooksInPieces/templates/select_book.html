@@ -19,66 +19,32 @@
                     <input type="number" name="minutes_per_reading" class="form-control" required>
                 </div>
                 <div class="mb-3">
-                    <label class="form-label">Ritmo di lettura (parole/minuto)</label>
-                    <select name="words_per_minute" class="form-select">
-                        <option value="160">Lento (160)</option>
-                        <option value="200" selected>Normale (200)</option>
-                        <option value="250">Veloce (250)</option>
-                    </select>
-                </div>
-                <div class="mb-4">
-                    <label class="form-label">Orario di consegna</label>
-                    <input type="time" name="delivery_time" class="form-control" list="delivery-time-suggestions">
-                    <datalist id="delivery-time-suggestions">
-                        <option value="07:30">Mattina (07:30)</option>
-                        <option value="21:00">Dopo cena (21:00)</option>
-                    </datalist>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Frequenza</label>
-                    <select name="frequency_type" class="form-select" id="frequency-type">
-                        <option value="every_n_days" selected>Ogni N giorni</option>
+                    <label class="form-label">Frequenza di invio</label>
+                    <select name="frequency_mode" class="form-select">
+                        <option value="interval">Ogni N giorni</option>
                         <option value="daily">Giornaliera</option>
                         <option value="weekdays">Giorni specifici</option>
                         <option value="weekend">Solo weekend</option>
                     </select>
                 </div>
-                <div class="mb-3" id="frequency-days-group">
-                    <label class="form-label">Ogni quanti giorni</label>
-                    <input type="number" name="frequency_days" class="form-control" min="1" value="1">
+                <div class="mb-3">
+                    <label class="form-label">Ogni quanti giorni (se scegli "Ogni N giorni")</label>
+                    <input type="number" name="frequency_days" class="form-control" value="1" min="1">
                 </div>
-                <div class="mb-4 d-none" id="weekdays-group">
-                    <label class="form-label">Seleziona i giorni</label>
+                <div class="mb-3">
+                    <label class="form-label">Giorni specifici (Lun/Mer/Ven...)</label>
                     <div class="d-flex flex-wrap gap-2">
-                        <label class="form-check">
-                            <input class="form-check-input" type="checkbox" name="weekdays" value="0">
-                            <span class="form-check-label">Lun</span>
+                        {% set weekday_labels = [('0','Lun'),('1','Mar'),('2','Mer'),('3','Gio'),('4','Ven'),('5','Sab'),('6','Dom')] %}
+                        {% for day_value, day_label in weekday_labels %}
+                        <label class="btn btn-outline-secondary btn-sm">
+                            <input class="form-check-input me-1" type="checkbox" name="frequency_weekdays" value="{{ day_value }}">{{ day_label }}
                         </label>
-                        <label class="form-check">
-                            <input class="form-check-input" type="checkbox" name="weekdays" value="1">
-                            <span class="form-check-label">Mar</span>
-                        </label>
-                        <label class="form-check">
-                            <input class="form-check-input" type="checkbox" name="weekdays" value="2">
-                            <span class="form-check-label">Mer</span>
-                        </label>
-                        <label class="form-check">
-                            <input class="form-check-input" type="checkbox" name="weekdays" value="3">
-                            <span class="form-check-label">Gio</span>
-                        </label>
-                        <label class="form-check">
-                            <input class="form-check-input" type="checkbox" name="weekdays" value="4">
-                            <span class="form-check-label">Ven</span>
-                        </label>
-                        <label class="form-check">
-                            <input class="form-check-input" type="checkbox" name="weekdays" value="5">
-                            <span class="form-check-label">Sab</span>
-                        </label>
-                        <label class="form-check">
-                            <input class="form-check-input" type="checkbox" name="weekdays" value="6">
-                            <span class="form-check-label">Dom</span>
-                        </label>
+                        {% endfor %}
                     </div>
+                </div>
+                <div class="mb-4">
+                    <label class="form-label">Orario consegna (es. 07:30 o "dopo cena")</label>
+                    <input type="text" name="delivery_time" class="form-control" placeholder="07:30 oppure dopo cena">
                 </div>
                 <button type="submit" class="btn btn-primary w-100">Imposta Programma</button>
             </form>
@@ -86,6 +52,62 @@
     </div>
 
     {% if active_schedules %}
+
+    {% if dashboard %}
+    <div class="col-lg-10">
+        <div class="card panel-card p-4 dashboard-card">
+            <h3 class="mb-3"><i class="bi bi-speedometer2 me-2"></i>Dashboard Lettura</h3>
+            <div class="row g-3 mb-3">
+                <div class="col-md-4">
+                    <div class="metric-box">
+                        <small>Completamento</small>
+                        <h4>{{ dashboard.completion }}%</h4>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="metric-box">
+                        <small>Rimanenti stimati</small>
+                        <h4>{{ dashboard.remaining_words }} parole</h4>
+                        <small>~{{ dashboard.remaining_minutes }} min</small>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="metric-box">
+                        <small>Streak</small>
+                        <h4>{{ dashboard.streak_days }} giorni consecutivi</h4>
+                    </div>
+                </div>
+            </div>
+            <h5 class="mb-2">Storico consegne + cosa mi sono perso</h5>
+            <ul class="list-group list-group-flush">
+                {% for item in dashboard.history %}
+                <li class="list-group-item d-flex justify-content-between align-items-start">
+                    <div>
+                        <strong>{{ item.book_title }}</strong>
+                        <div class="text-muted small">{{ item.created_at.strftime('%d/%m/%Y %H:%M') }}</div>
+                        <div>
+                            {% if item.event_type == 'sent' %}
+                                ✅ Consegna inviata ({{ item.words_count }} parole)
+                            {% elif item.event_type == 'skipped' %}
+                                ⚠️ Persa/saltata: {{ item.note }}
+                            {% elif item.event_type == 'paused' %}
+                                ⏸️ {{ item.note }}
+                            {% elif item.event_type == 'resumed' %}
+                                ▶️ {{ item.note }}
+                            {% else %}
+                                {{ item.note or item.event_type }}
+                            {% endif %}
+                        </div>
+                    </div>
+                </li>
+                {% else %}
+                <li class="list-group-item text-muted">Nessun evento disponibile.</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+    {% endif %}
+
     <div class="col-lg-8">
         <div class="card panel-card p-4">
             <h3 class="mb-3"><i class="bi bi-calendar3 me-2"></i>Sottoscrizioni Attive</h3>
@@ -95,30 +117,12 @@
                     <div>
                         <strong>{{ schedule.book.title }}</strong>
                         <br>
-                        <small class="text-muted">
-                            Frequenza:
-                            {% if schedule.frequency_type == 'daily' %}
-                                giornaliera
-                            {% elif schedule.frequency_type == 'weekdays' %}
-                                giorni specifici
-                            {% elif schedule.frequency_type == 'weekend' %}
-                                solo weekend
-                            {% else %}
-                                ogni {{ schedule.frequency_days }} giorni
-                            {% endif %}
-                            {% if schedule.delivery_time %}
-                                • alle {{ schedule.delivery_time.strftime('%H:%M') }}
-                            {% endif %}
-                        </small>
+                        <small class="text-muted">Frequenza: {{ describe_frequency(schedule) }}</small>
                         <br>
-                        <small class="text-muted">
-                            Prossima consegna: {{ schedule.next_send_date.strftime('%d/%m/%Y %H:%M') }}
-                        </small>
-                        {% if schedule.snooze_until %}
-                            <div><span class="badge text-bg-info">Snooze fino a {{ schedule.snooze_until.strftime('%d/%m/%Y %H:%M') }}</span></div>
-                        {% endif %}
+                        <small class="text-muted">Orario: {{ schedule.delivery_time.strftime('%H:%M') if schedule.delivery_time else '08:00 (default)' }}</small>
                         {% if schedule.travel_pause_until %}
-                            <div><span class="badge text-bg-secondary">Viaggio fino a {{ schedule.travel_pause_until.strftime('%d/%m/%Y %H:%M') }}</span></div>
+                        <br>
+                        <small class="text-warning">Modalità viaggio fino al {{ schedule.travel_pause_until.strftime('%d/%m/%Y %H:%M') }}</small>
                         {% endif %}
                     </div>
                     <div class="d-flex gap-2">
@@ -140,14 +144,15 @@
                         </form>
                     </div>
                     <div class="w-100 d-flex flex-wrap gap-2 mt-2">
-                        <form action="{{ url_for('app_routes.travel_mode', schedule_id=schedule.id) }}" method="post" class="d-flex flex-wrap gap-2 align-items-end">
-                            <input type="date" name="resume_date" class="form-control form-control-sm" required>
-                            <input type="time" name="resume_time" class="form-control form-control-sm">
-                            <button type="submit" class="btn btn-outline-primary btn-sm">Modalità viaggio</button>
+                        <form action="{{ url_for('app_routes.snooze_next_schedule', schedule_id=schedule.id) }}" method="post" class="d-inline">
+                            <button type="submit" class="btn btn-outline-primary btn-sm">Salta prossima consegna</button>
                         </form>
-                        <form action="{{ url_for('app_routes.travel_mode', schedule_id=schedule.id) }}" method="post">
-                            <input type="hidden" name="action" value="clear">
-                            <button type="submit" class="btn btn-outline-primary btn-sm">Disattiva viaggio</button>
+                        <form action="{{ url_for('app_routes.snooze_24h_schedule', schedule_id=schedule.id) }}" method="post" class="d-inline">
+                            <button type="submit" class="btn btn-outline-primary btn-sm">Rimanda di 24h</button>
+                        </form>
+                        <form action="{{ url_for('app_routes.travel_mode_schedule', schedule_id=schedule.id) }}" method="post" class="d-flex gap-2 align-items-center">
+                            <input type="number" name="travel_days" class="form-control form-control-sm" min="1" value="7" style="max-width: 90px;">
+                            <button type="submit" class="btn btn-outline-warning btn-sm">Modalità viaggio</button>
                         </form>
                     </div>
                 </li>

@@ -15,7 +15,6 @@ WEEKDAY_LABELS = {
     "sun": 6,
 }
 
-
 def parse_weekdays(value):
     if not value:
         return set()

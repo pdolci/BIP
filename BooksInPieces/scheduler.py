@@ -1,5 +1,6 @@
 import logging
 from apscheduler.schedulers.background import BackgroundScheduler
+from datetime import datetime
 import datetime
 from flask import Flask
 from models import ReadingSchedule
@@ -16,6 +17,7 @@ def check_scheduled_emails(app: Flask):
     logging.info("✅ Job check_scheduled_emails AVVIATO")
 
     with app.app_context():  # ✅ Creiamo manualmente il contesto Flask
+        now = datetime.utcnow()
         now = datetime.datetime.utcnow()
         logging.info(f"🕒 Checking schedules at {now}")
         
@@ -28,7 +30,11 @@ def check_scheduled_emails(app: Flask):
             logging.info(f"🔍 ID: {sched.id} | User: {sched.user_id} | Book: {sched.book_id} | Next Send: {sched.next_send_date}")
 
         # Fetch fresh data from the database with filtering
-        schedules = db.session.query(ReadingSchedule).filter(ReadingSchedule.next_send_date <= now, ReadingSchedule.is_paused.is_(False)).all()
+        schedules = db.session.query(ReadingSchedule).filter(
+            ReadingSchedule.next_send_date <= now,
+            ReadingSchedule.is_paused.is_(False),
+            db.or_(ReadingSchedule.travel_pause_until.is_(None), ReadingSchedule.travel_pause_until <= now),
+        ).all()
         
         # 🔴 DEBUG: Log how many schedules were found
         logging.info(f"📊 Found {len(schedules)} schedules due for sending.")
@@ -103,3 +109,4 @@ def start_scheduler(app: Flask):
         logging.info("⚠️ Scheduler era già attivo, nessuna azione necessaria.")
     
     return scheduler
+

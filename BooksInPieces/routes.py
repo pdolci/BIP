@@ -1,12 +1,14 @@
 import os
 import datetime
+import re
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash, send_from_directory
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 from werkzeug.utils import secure_filename
 from extensions import db
-from models import User, Book, ReadingSchedule
+from models import User, Book, ReadingSchedule, DeliveryEvent
 from email_sender import send_next_book_part, send_password_reset_email
 from config import Config
+from schedule_utils import parse_delivery_time, compute_next_send_date, WEEKDAY_CHOICES, describe_frequency
 from schedule_utils import (
     parse_time_str,
     serialize_weekdays,
@@ -23,6 +25,79 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 ALLOWED_EXTENSIONS = {"txt", "html", "htm"}
 
 app_routes = Blueprint("app_routes", __name__)
+
+
+def _count_book_words(schedule):
+    """Conta le parole del libro per mostrare metriche di progresso."""
+    try:
+        with open(schedule.book.get_absolute_path(), "r", encoding="utf-8", errors="replace") as source:
+            return len(re.findall(r"\S+", source.read()))
+    except Exception as error:
+        logging.warning(f"⚠️ Impossibile calcolare le parole per schedule {schedule.id}: {error}")
+        return 0
+
+
+def _compute_streak(sent_events):
+    if not sent_events:
+        return 0
+
+    sent_days = sorted({event.created_at.date() for event in sent_events}, reverse=True)
+    streak = 0
+    cursor = sent_days[0]
+    for day in sent_days:
+        if day == cursor:
+            streak += 1
+            cursor = cursor - datetime.timedelta(days=1)
+        elif day < cursor:
+            break
+    return streak
+
+
+def _build_dashboard(active_schedules):
+    if not active_schedules:
+        return None
+
+    total_words = 0
+    total_read = 0
+    total_remaining_minutes = 0
+    sent_events = []
+    history = []
+
+    for schedule in active_schedules:
+        schedule_total_words = _count_book_words(schedule)
+        schedule_read_words = min(schedule.last_sent_index, schedule_total_words) if schedule_total_words else schedule.last_sent_index
+        remaining_words = max(schedule_total_words - schedule_read_words, 0)
+
+        total_words += schedule_total_words
+        total_read += schedule_read_words
+
+        words_per_session = max(schedule.words_per_minute * schedule.minutes_per_reading, 1)
+        remaining_sessions = remaining_words / words_per_session
+        total_remaining_minutes += int(round(remaining_sessions * schedule.minutes_per_reading))
+
+        schedule_events = DeliveryEvent.query.filter_by(schedule_id=schedule.id).order_by(DeliveryEvent.created_at.desc()).limit(12).all()
+        sent_events.extend([event for event in schedule_events if event.event_type == "sent"])
+
+        for event in schedule_events:
+            history.append({
+                "book_title": schedule.book.title,
+                "event_type": event.event_type,
+                "created_at": event.created_at,
+                "note": event.note,
+                "words_count": event.words_count,
+            })
+
+    completion = int(round((total_read / total_words) * 100)) if total_words else 0
+    remaining_words = max(total_words - total_read, 0)
+    history.sort(key=lambda item: item["created_at"], reverse=True)
+
+    return {
+        "completion": completion,
+        "remaining_words": remaining_words,
+        "remaining_minutes": total_remaining_minutes,
+        "streak_days": _compute_streak(sent_events),
+        "history": history[:20],
+    }
 
 def get_reset_token_serializer():
     """Crea il serializer usato per il recupero password."""
@@ -140,6 +215,15 @@ def select_book():
     if request.method == "POST":
         book_id = request.form["book_id"]
         minutes_per_reading = int(request.form["minutes_per_reading"])
+        frequency_mode = request.form.get("frequency_mode", "interval")
+        frequency_days = int(request.form.get("frequency_days", 1) or 1)
+        selected_weekdays = request.form.getlist("frequency_weekdays")
+        frequency_weekdays = ",".join(day for day in selected_weekdays if day in WEEKDAY_CHOICES)
+        delivery_time = parse_delivery_time(request.form.get("delivery_time", ""))
+
+        if request.form.get("delivery_time") and delivery_time is None:
+            flash("Orario non valido. Usa formato HH:MM (es. 07:30) oppure etichette come 'dopo cena'.")
+            return redirect(url_for("app_routes.select_book"))
         words_per_minute = int(request.form.get("words_per_minute", 200))
         frequency_type = request.form.get("frequency_type", FREQ_EVERY_N_DAYS)
         frequency_days = int(request.form.get("frequency_days", 1))
@@ -182,6 +266,10 @@ def select_book():
             minutes_per_reading=minutes_per_reading,
             frequency_type=frequency_type,
             frequency_days=frequency_days,
+            frequency_mode=frequency_mode,
+            frequency_weekdays=frequency_weekdays,
+            delivery_time=delivery_time,
+            next_send_date=datetime.datetime.utcnow(),
             weekdays=weekdays,
             delivery_time=delivery_time,
             next_send_date=next_send_date,
@@ -288,11 +376,103 @@ def pause_schedule(schedule_id):
     
     if schedule and schedule.user_id == session["user_id"]:
         schedule.is_paused = not schedule.is_paused  # Toggle status
+        db.session.add(DeliveryEvent(
+            schedule_id=schedule.id,
+            event_type="paused" if schedule.is_paused else "resumed",
+            words_count=0,
+            note="Pausa attivata" if schedule.is_paused else "Lettura ripresa",
+        ))
         db.session.commit()
         flash("Sottoscrizione aggiornata con successo!")
     else:
         flash("Operazione non consentita.")
 
+    return redirect(url_for("app_routes.select_book"))
+
+
+@app_routes.route("/snooze_next_schedule/<int:schedule_id>", methods=["POST"])
+def snooze_next_schedule(schedule_id):
+    if "user_id" not in session:
+        flash("Devi effettuare il login per modificare la tua sottoscrizione.")
+        return redirect(url_for("app_routes.login"))
+
+    schedule = ReadingSchedule.query.get(schedule_id)
+    if not schedule or schedule.user_id != session["user_id"]:
+        flash("Operazione non consentita.")
+        return redirect(url_for("app_routes.select_book"))
+
+    now = datetime.datetime.utcnow()
+    reference = max(schedule.next_send_date, now)
+    schedule.next_send_date = compute_next_send_date(
+        reference,
+        schedule.frequency_mode,
+        schedule.frequency_days,
+        schedule.frequency_weekdays,
+        schedule.delivery_time,
+    )
+    db.session.add(DeliveryEvent(
+        schedule_id=schedule.id,
+        event_type="skipped",
+        words_count=0,
+        note="Salto prossima consegna",
+    ))
+    db.session.commit()
+    flash("Prossima consegna saltata con successo.")
+    return redirect(url_for("app_routes.select_book"))
+
+
+@app_routes.route("/snooze_24h_schedule/<int:schedule_id>", methods=["POST"])
+def snooze_24h_schedule(schedule_id):
+    if "user_id" not in session:
+        flash("Devi effettuare il login per modificare la tua sottoscrizione.")
+        return redirect(url_for("app_routes.login"))
+
+    schedule = ReadingSchedule.query.get(schedule_id)
+    if not schedule or schedule.user_id != session["user_id"]:
+        flash("Operazione non consentita.")
+        return redirect(url_for("app_routes.select_book"))
+
+    now = datetime.datetime.utcnow()
+    schedule.next_send_date = max(schedule.next_send_date, now) + datetime.timedelta(hours=24)
+    db.session.add(DeliveryEvent(
+        schedule_id=schedule.id,
+        event_type="skipped",
+        words_count=0,
+        note="Rimandata di 24 ore",
+    ))
+    db.session.commit()
+    flash("Consegna rimandata di 24 ore.")
+    return redirect(url_for("app_routes.select_book"))
+
+
+@app_routes.route("/travel_mode_schedule/<int:schedule_id>", methods=["POST"])
+def travel_mode_schedule(schedule_id):
+    if "user_id" not in session:
+        flash("Devi effettuare il login per modificare la tua sottoscrizione.")
+        return redirect(url_for("app_routes.login"))
+
+    schedule = ReadingSchedule.query.get(schedule_id)
+    if not schedule or schedule.user_id != session["user_id"]:
+        flash("Operazione non consentita.")
+        return redirect(url_for("app_routes.select_book"))
+
+    travel_days = int(request.form.get("travel_days", 0) or 0)
+    if travel_days <= 0:
+        flash("Inserisci un numero di giorni valido per la modalità viaggio.")
+        return redirect(url_for("app_routes.select_book"))
+
+    now = datetime.datetime.utcnow()
+    schedule.travel_pause_until = now + datetime.timedelta(days=travel_days)
+    if schedule.next_send_date < schedule.travel_pause_until:
+        schedule.next_send_date = schedule.travel_pause_until
+    db.session.add(DeliveryEvent(
+        schedule_id=schedule.id,
+        event_type="skipped",
+        words_count=0,
+        note=f"Modalità viaggio ({travel_days} giorni)",
+    ))
+    db.session.commit()
+    flash(f"Modalità viaggio attivata per {travel_days} giorni.")
     return redirect(url_for("app_routes.select_book"))
 
 @app_routes.route("/delete_schedule/<int:schedule_id>", methods=["POST"])
