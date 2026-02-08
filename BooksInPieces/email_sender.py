@@ -1,5 +1,4 @@
 import logging
-import datetime
 import html
 import re
 from dataclasses import dataclass
@@ -8,6 +7,7 @@ from extensions import mail, db
 from models import ReadingSchedule, Book, User, DeliveryEvent
 from config import Config
 from schedule_utils import compute_next_send_datetime
+from time_utils import utc_now_naive
 import chardet
 
 ANSI_ESCAPE_RE = re.compile(r"\x1B(?:\[[0-?]*[ -/]*[@-~]|[@-Z\\-_])")
@@ -296,7 +296,7 @@ def send_next_book_part(schedule_id):
 
     try:
         schedule.last_sent_index = new_index
-        schedule.next_send_date = compute_next_send_datetime(datetime.datetime.utcnow(), schedule, allow_immediate=False)
+        schedule.next_send_date = compute_next_send_datetime(utc_now_naive(), schedule, allow_immediate=False)
         db.session.commit()  # Removed unnecessary add()
         logging.info(f"✅ Database aggiornato per l'utente {user.email}")
     except Exception as e:

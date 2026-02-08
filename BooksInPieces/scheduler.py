@@ -1,11 +1,11 @@
 import logging
 from apscheduler.schedulers.background import BackgroundScheduler
-import datetime
 from flask import Flask
 from models import ReadingSchedule
 from extensions import db
 from email_sender import send_next_book_part
 from schedule_utils import compute_next_send_datetime
+from time_utils import utc_now_naive
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
@@ -16,7 +16,7 @@ def check_scheduled_emails(app: Flask):
     logging.info("✅ Job check_scheduled_emails AVVIATO")
 
     with app.app_context():  # ✅ Creiamo manualmente il contesto Flask
-        now = datetime.datetime.utcnow()
+        now = utc_now_naive()
         logging.info(f"🕒 Checking schedules at {now}")
         
         db.session.expire_all()

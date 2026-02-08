@@ -19,6 +19,7 @@ from schedule_utils import (
     FREQ_WEEKEND,
 )
 import logging
+from time_utils import utc_now_naive, local_now_naive, local_naive_to_utc_naive
 
 UPLOAD_FOLDER = Config.UPLOAD_FOLDER
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -268,7 +269,7 @@ def select_book():
         elif frequency_type == FREQ_WEEKEND:
             weekdays = serialize_weekdays([5, 6])
 
-        now = datetime.datetime.utcnow()
+        now = local_now_naive()
         next_send_date = compute_next_send_datetime_from_params(
             now,
             frequency_type,
@@ -289,7 +290,7 @@ def select_book():
             frequency_weekdays=weekdays,
             weekdays=weekdays,
             delivery_time=delivery_time,
-            next_send_date=next_send_date,
+            next_send_date=local_naive_to_utc_naive(next_send_date),
             is_paused=False
         )
         db.session.add(schedule)
@@ -320,7 +321,7 @@ def snooze_schedule(schedule_id):
         return redirect(url_for("app_routes.select_book"))
 
     action = request.form.get("action")
-    now = datetime.datetime.utcnow()
+    now = utc_now_naive()
 
     if action == "skip_next":
         schedule.skip_next = True
@@ -351,7 +352,7 @@ def travel_mode(schedule_id):
         return redirect(url_for("app_routes.select_book"))
 
     action = request.form.get("action")
-    now = datetime.datetime.utcnow()
+    now = utc_now_naive()
 
     if action == "clear":
         schedule.travel_pause_until = None
@@ -376,7 +377,8 @@ def travel_mode(schedule_id):
     if resume_time is None:
         resume_time = schedule.delivery_time or datetime.time(9, 0)
 
-    resume_at = datetime.datetime.combine(resume_date, resume_time)
+    resume_at_local = datetime.datetime.combine(resume_date, resume_time)
+    resume_at = local_naive_to_utc_naive(resume_at_local)
 
     if resume_at <= now:
         flash("La ripartenza deve essere nel futuro.")
@@ -425,7 +427,7 @@ def snooze_next_schedule(schedule_id):
         flash("Operazione non consentita.")
         return redirect(url_for("app_routes.select_book"))
 
-    now = datetime.datetime.utcnow()
+    now = utc_now_naive()
     reference = max(schedule.next_send_date, now)
     schedule.next_send_date = compute_next_send_datetime(reference, schedule, allow_immediate=False)
     db.session.add(DeliveryEvent(
@@ -450,7 +452,7 @@ def snooze_24h_schedule(schedule_id):
         flash("Operazione non consentita.")
         return redirect(url_for("app_routes.select_book"))
 
-    now = datetime.datetime.utcnow()
+    now = utc_now_naive()
     schedule.next_send_date = max(schedule.next_send_date, now) + datetime.timedelta(hours=24)
     db.session.add(DeliveryEvent(
         schedule_id=schedule.id,
@@ -479,7 +481,7 @@ def travel_mode_schedule(schedule_id):
         flash("Inserisci un numero di giorni valido per la modalità viaggio.")
         return redirect(url_for("app_routes.select_book"))
 
-    now = datetime.datetime.utcnow()
+    now = utc_now_naive()
     schedule.travel_pause_until = now + datetime.timedelta(days=travel_days)
     if schedule.next_send_date < schedule.travel_pause_until:
         schedule.next_send_date = schedule.travel_pause_until
