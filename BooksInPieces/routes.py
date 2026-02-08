@@ -298,7 +298,14 @@ def select_book():
         return redirect(url_for("app_routes.select_book"))
 
     books = Book.query.all()
-    return render_template("select_book.html", books=books, active_schedules=active_schedules)
+    dashboard = _build_dashboard(active_schedules)
+    return render_template(
+        "select_book.html",
+        books=books,
+        active_schedules=active_schedules,
+        dashboard=dashboard,
+        describe_frequency=describe_frequency,
+    )
 
 
 @app_routes.route("/snooze_schedule/<int:schedule_id>", methods=["POST"])
