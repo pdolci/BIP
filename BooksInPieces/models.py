@@ -1,5 +1,4 @@
 import os
-import datetime
 from extensions import db
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -39,10 +38,4 @@ class ReadingSchedule(db.Model):
     next_send_date = db.Column(db.DateTime, nullable=False)
     is_paused = db.Column(db.Boolean, default=False) 
     book = db.relationship("Book", backref="schedules", lazy=True)
-    
-    def check_password(self, password):
-        return check_password_hash(self.password_hash, password)
-    
-    def check_password(self, password):
-        return check_password_hash(self.password_hash, password)
-    
+

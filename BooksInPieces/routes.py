@@ -1,10 +1,11 @@
 import os
 import datetime
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash, send_from_directory
+from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 from werkzeug.utils import secure_filename
 from extensions import db
 from models import User, Book, ReadingSchedule
-from email_sender import send_next_book_part
+from email_sender import send_next_book_part, send_password_reset_email
 from config import Config
 import logging
 
@@ -13,6 +14,10 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 ALLOWED_EXTENSIONS = {"txt"}
 
 app_routes = Blueprint("app_routes", __name__)
+
+def get_reset_token_serializer():
+    """Crea il serializer usato per il recupero password."""
+    return URLSafeTimedSerializer(Config.SECRET_KEY)
 
 def allowed_file(filename):
     """ Controlla se il file ha un'estensione permessa """
@@ -59,6 +64,53 @@ def login():
         else:
             flash("Credenziali non valide!")
     return render_template("login.html")
+
+@app_routes.route("/forgot_password", methods=["GET", "POST"])
+def forgot_password():
+    if request.method == "POST":
+        email = request.form["email"]
+        user = User.query.filter_by(email=email).first()
+
+        if user:
+            serializer = get_reset_token_serializer()
+            token = serializer.dumps(user.email, salt="password-reset")
+            reset_url = url_for("app_routes.reset_password", token=token, _external=True)
+            send_password_reset_email(user.email, reset_url)
+
+        flash("Se l'email è registrata, riceverai un link per reimpostare la password.")
+        return redirect(url_for("app_routes.login"))
+
+    return render_template("forgot_password.html")
+
+@app_routes.route("/reset_password/<token>", methods=["GET", "POST"])
+def reset_password(token):
+    serializer = get_reset_token_serializer()
+
+    try:
+        email = serializer.loads(token, salt="password-reset", max_age=3600)
+    except (SignatureExpired, BadSignature):
+        flash("Link di recupero non valido o scaduto.")
+        return redirect(url_for("app_routes.forgot_password"))
+
+    user = User.query.filter_by(email=email).first()
+    if not user:
+        flash("Utente non trovato.")
+        return redirect(url_for("app_routes.forgot_password"))
+
+    if request.method == "POST":
+        password = request.form["password"]
+        confirm_password = request.form["confirm_password"]
+
+        if password != confirm_password:
+            flash("Le password non coincidono.")
+            return redirect(url_for("app_routes.reset_password", token=token))
+
+        user.set_password(password)
+        db.session.commit()
+        flash("Password aggiornata con successo! Ora puoi accedere.")
+        return redirect(url_for("app_routes.login"))
+
+    return render_template("reset_password.html")
 
 @app_routes.route("/logout")
 def logout():
