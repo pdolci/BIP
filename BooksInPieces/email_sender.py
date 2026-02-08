@@ -1,22 +1,58 @@
 import logging
 import datetime
+import html
+import re
 from flask_mail import Message
 from extensions import mail, db
 from models import ReadingSchedule, Book, User
 from config import Config
 import chardet
 
-def send_email(to, subject, body):
+def send_email(to, subject, body, html_body=None):
     """ Invia una email e logga eventuali errori """
     try:
         msg = Message(subject, sender=Config.MAIL_USERNAME, recipients=[to])  # Updated sender
         msg.body = body
+        if html_body:
+            msg.html = html_body
 
         logging.info(f"\U0001F4E7 Tentativo di invio email a {to} con oggetto: {subject}")
         mail.send(msg)
         logging.info(f"✅ Email inviata correttamente a {to}")
     except Exception as e:
         logging.error(f"❌ Errore nell'invio email a {to}: {e}")
+
+
+def is_html_file(file_path):
+    return file_path.lower().endswith((".html", ".htm"))
+
+
+def html_to_text(content):
+    """Converte un contenuto HTML in testo leggibile."""
+    content = re.sub(r"<script.*?>.*?</script>", "", content, flags=re.IGNORECASE | re.DOTALL)
+    content = re.sub(r"<style.*?>.*?</style>", "", content, flags=re.IGNORECASE | re.DOTALL)
+    content = re.sub(r"</?(p|div|h[1-6]|li|ul|ol|blockquote|section|article|br)\b[^>]*>", "\n", content, flags=re.IGNORECASE)
+    content = re.sub(r"<[^>]+>", "", content)
+    content = html.unescape(content)
+    return re.sub(r"\n\s*\n+", "\n\n", content).strip()
+
+
+def build_email_bodies(chunk_text, is_html_source=False):
+    """Genera corpo testo e corpo HTML per l'email."""
+    plain_text = html_to_text(chunk_text) if is_html_source else chunk_text.strip()
+
+    if is_html_source:
+        cleaned_html = re.sub(r"<script.*?>.*?</script>", "", chunk_text, flags=re.IGNORECASE | re.DOTALL)
+        html_body = f"<div style='font-family: Arial, sans-serif; line-height: 1.6;'>{cleaned_html}</div>"
+    else:
+        escaped_text = html.escape(plain_text).replace("\n", "<br>")
+        html_body = (
+            "<div style='font-family: Arial, sans-serif; line-height: 1.6;'>"
+            f"{escaped_text}"
+            "</div>"
+        )
+
+    return plain_text, html_body
 
 def detect_encoding(file_path):
     """ Rileva la codifica del file per evitare errori di lettura. """
@@ -32,14 +68,15 @@ def read_file_chunk(file_path, start_idx, length):
         encoding = detect_encoding(file_path)  # ✅ Detect file encoding
         with open(file_path, 'r', encoding=encoding) as file:
             logging.info(f"📖 File aperto con successo: {file_path}, partendo da {start_idx}")
-            
-            lines = file.readlines()  # Read file as lines to preserve formatting
-            text = "".join(lines)  # Preserve original formatting
-            words = text.split()
+
+            source_content = file.read()
+            source_is_html = is_html_file(file_path)
+            readable_content = html_to_text(source_content) if source_is_html else source_content
+            words = readable_content.split()
             
             if start_idx >= len(words):  # Check if start index exceeds word count
                 logging.info("⚠️ Nessun altro testo da inviare, fine della lettura.")
-                return None, start_idx
+                return None, start_idx, source_is_html
 
             # Extract the required number of words
             chunk_words = words[start_idx:start_idx + length]
@@ -51,23 +88,14 @@ def read_file_chunk(file_path, start_idx, length):
                 chunk_words.append(words[new_index])
                 new_index += 1
 
-            # Find the corresponding lines that contain the extracted words
-            chunk_text = ""
-            word_count = 0
-            for line in lines:
-                words_in_line = line.split()
-                if word_count >= start_idx and word_count < new_index:
-                    chunk_text += line
-                word_count += len(words_in_line)
-                if word_count >= new_index:
-                    break
+            chunk_text = " ".join(chunk_words)
             
             logging.info(f"📖 Chunk letto ({len(chunk_words)} parole): {chunk_text[:100]}...")  # Anteprima primo pezzo
             
-            return chunk_text, new_index
+            return chunk_text, new_index, source_is_html
     except Exception as e:
         logging.error(f"❌ Errore nella lettura del file {file_path}: {e}")
-        return None, start_idx
+        return None, start_idx, False
 
 def send_next_book_part(schedule_id):
     """ Invia la prossima sezione del libro via email """
@@ -85,14 +113,18 @@ def send_next_book_part(schedule_id):
         return
 
     file_path = book.get_absolute_path()  # Use method to get path
-    chunk, new_index = read_file_chunk(file_path, schedule.last_sent_index,
-                                       schedule.words_per_minute * schedule.minutes_per_reading)
+    chunk, new_index, source_is_html = read_file_chunk(
+        file_path,
+        schedule.last_sent_index,
+        schedule.words_per_minute * schedule.minutes_per_reading,
+    )
 
     if not chunk:
         logging.info("⚠️ Nessun altro testo da inviare, fine della lettura.")
         return
 
-    send_email(user.email, f"{book.title} - Nuova lettura", chunk)
+    text_body, html_body = build_email_bodies(chunk, is_html_source=source_is_html)
+    send_email(user.email, f"{book.title} - Nuova lettura", text_body, html_body=html_body)
 
     # Instead of sending an email, print the chunk
     #logging.info(f"📖 Chunk for {user.email} - {book.title}:")
@@ -120,4 +152,11 @@ def send_password_reset_email(user_email, reset_url):
         f"Apri questo link per impostarne una nuova: {reset_url}\n\n"
         "Se non hai richiesto tu questa operazione, ignora questa email."
     )
-    send_email(user_email, subject, body)
+    html_body = (
+        "<div style='font-family: Arial, sans-serif; line-height: 1.6;'>"
+        "<p>Hai richiesto il recupero della password.</p>"
+        f"<p>Apri questo link per impostarne una nuova: <a href='{html.escape(reset_url)}'>{html.escape(reset_url)}</a></p>"
+        "<p>Se non hai richiesto tu questa operazione, ignora questa email.</p>"
+        "</div>"
+    )
+    send_email(user_email, subject, body, html_body=html_body)

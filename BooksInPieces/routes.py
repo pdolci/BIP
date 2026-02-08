@@ -11,7 +11,7 @@ import logging
 
 UPLOAD_FOLDER = Config.UPLOAD_FOLDER
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-ALLOWED_EXTENSIONS = {"txt"}
+ALLOWED_EXTENSIONS = {"txt", "html", "htm"}
 
 app_routes = Blueprint("app_routes", __name__)
 
@@ -278,4 +278,3 @@ def test_email_sending(schedule_id):
     send_next_book_part(schedule_id)
     flash("Email inviata con successo!")
     return redirect(url_for("app_routes.manage_books"))
-
