@@ -16,3 +16,4 @@ class Config:
     MAIL_PASSWORD = "vhxd seyr sgqi rljb"
     #MAIL_USERNAME = os.environ.get("MAIL_USERNAME", "default_email")
     #MAIL_PASSWORD = os.environ.get("MAIL_PASSWORD", "default_password")
+    APP_TIMEZONE = os.environ.get("APP_TIMEZONE", "Europe/Rome")
