@@ -7,6 +7,7 @@ from extensions import db
 from models import User, Book, ReadingSchedule
 from email_sender import send_next_book_part, send_password_reset_email
 from config import Config
+from schedule_utils import parse_delivery_time, compute_next_send_date, WEEKDAY_CHOICES, describe_frequency
 import logging
 
 UPLOAD_FOLDER = Config.UPLOAD_FOLDER
@@ -131,7 +132,15 @@ def select_book():
     if request.method == "POST":
         book_id = request.form["book_id"]
         minutes_per_reading = int(request.form["minutes_per_reading"])
-        frequency_days = int(request.form["frequency_days"])
+        frequency_mode = request.form.get("frequency_mode", "interval")
+        frequency_days = int(request.form.get("frequency_days", 1) or 1)
+        selected_weekdays = request.form.getlist("frequency_weekdays")
+        frequency_weekdays = ",".join(day for day in selected_weekdays if day in WEEKDAY_CHOICES)
+        delivery_time = parse_delivery_time(request.form.get("delivery_time", ""))
+
+        if request.form.get("delivery_time") and delivery_time is None:
+            flash("Orario non valido. Usa formato HH:MM (es. 07:30) oppure etichette come 'dopo cena'.")
+            return redirect(url_for("app_routes.select_book"))
 
         if any(not schedule.is_paused for schedule in active_schedules):
             flash("Hai già una sottoscrizione attiva. Mettila in pausa o cancellala prima di aggiungerne un'altra.")
@@ -142,6 +151,9 @@ def select_book():
             book_id=book_id,
             minutes_per_reading=minutes_per_reading,
             frequency_days=frequency_days,
+            frequency_mode=frequency_mode,
+            frequency_weekdays=frequency_weekdays,
+            delivery_time=delivery_time,
             next_send_date=datetime.datetime.utcnow(),
             is_paused=False
         )
@@ -151,7 +163,7 @@ def select_book():
         return redirect(url_for("app_routes.select_book"))
 
     books = Book.query.all()
-    return render_template("select_book.html", books=books, active_schedules=active_schedules)
+    return render_template("select_book.html", books=books, active_schedules=active_schedules, describe_frequency=describe_frequency)
 
 @app_routes.route("/pause_schedule/<int:schedule_id>", methods=["POST"])
 def pause_schedule(schedule_id):
@@ -168,6 +180,74 @@ def pause_schedule(schedule_id):
     else:
         flash("Operazione non consentita.")
 
+    return redirect(url_for("app_routes.select_book"))
+
+
+@app_routes.route("/snooze_next_schedule/<int:schedule_id>", methods=["POST"])
+def snooze_next_schedule(schedule_id):
+    if "user_id" not in session:
+        flash("Devi effettuare il login per modificare la tua sottoscrizione.")
+        return redirect(url_for("app_routes.login"))
+
+    schedule = ReadingSchedule.query.get(schedule_id)
+    if not schedule or schedule.user_id != session["user_id"]:
+        flash("Operazione non consentita.")
+        return redirect(url_for("app_routes.select_book"))
+
+    now = datetime.datetime.utcnow()
+    reference = max(schedule.next_send_date, now)
+    schedule.next_send_date = compute_next_send_date(
+        reference,
+        schedule.frequency_mode,
+        schedule.frequency_days,
+        schedule.frequency_weekdays,
+        schedule.delivery_time,
+    )
+    db.session.commit()
+    flash("Prossima consegna saltata con successo.")
+    return redirect(url_for("app_routes.select_book"))
+
+
+@app_routes.route("/snooze_24h_schedule/<int:schedule_id>", methods=["POST"])
+def snooze_24h_schedule(schedule_id):
+    if "user_id" not in session:
+        flash("Devi effettuare il login per modificare la tua sottoscrizione.")
+        return redirect(url_for("app_routes.login"))
+
+    schedule = ReadingSchedule.query.get(schedule_id)
+    if not schedule or schedule.user_id != session["user_id"]:
+        flash("Operazione non consentita.")
+        return redirect(url_for("app_routes.select_book"))
+
+    now = datetime.datetime.utcnow()
+    schedule.next_send_date = max(schedule.next_send_date, now) + datetime.timedelta(hours=24)
+    db.session.commit()
+    flash("Consegna rimandata di 24 ore.")
+    return redirect(url_for("app_routes.select_book"))
+
+
+@app_routes.route("/travel_mode_schedule/<int:schedule_id>", methods=["POST"])
+def travel_mode_schedule(schedule_id):
+    if "user_id" not in session:
+        flash("Devi effettuare il login per modificare la tua sottoscrizione.")
+        return redirect(url_for("app_routes.login"))
+
+    schedule = ReadingSchedule.query.get(schedule_id)
+    if not schedule or schedule.user_id != session["user_id"]:
+        flash("Operazione non consentita.")
+        return redirect(url_for("app_routes.select_book"))
+
+    travel_days = int(request.form.get("travel_days", 0) or 0)
+    if travel_days <= 0:
+        flash("Inserisci un numero di giorni valido per la modalità viaggio.")
+        return redirect(url_for("app_routes.select_book"))
+
+    now = datetime.datetime.utcnow()
+    schedule.travel_pause_until = now + datetime.timedelta(days=travel_days)
+    if schedule.next_send_date < schedule.travel_pause_until:
+        schedule.next_send_date = schedule.travel_pause_until
+    db.session.commit()
+    flash(f"Modalità viaggio attivata per {travel_days} giorni.")
     return redirect(url_for("app_routes.select_book"))
 
 @app_routes.route("/delete_schedule/<int:schedule_id>", methods=["POST"])

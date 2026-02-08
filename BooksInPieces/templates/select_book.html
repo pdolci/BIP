@@ -18,9 +18,33 @@
                     <label class="form-label">Minuti per sessione di lettura</label>
                     <input type="number" name="minutes_per_reading" class="form-control" required>
                 </div>
+                <div class="mb-3">
+                    <label class="form-label">Frequenza di invio</label>
+                    <select name="frequency_mode" class="form-select">
+                        <option value="interval">Ogni N giorni</option>
+                        <option value="daily">Giornaliera</option>
+                        <option value="weekdays">Giorni specifici</option>
+                        <option value="weekend">Solo weekend</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Ogni quanti giorni (se scegli "Ogni N giorni")</label>
+                    <input type="number" name="frequency_days" class="form-control" value="1" min="1">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Giorni specifici (Lun/Mer/Ven...)</label>
+                    <div class="d-flex flex-wrap gap-2">
+                        {% set weekday_labels = [('0','Lun'),('1','Mar'),('2','Mer'),('3','Gio'),('4','Ven'),('5','Sab'),('6','Dom')] %}
+                        {% for day_value, day_label in weekday_labels %}
+                        <label class="btn btn-outline-secondary btn-sm">
+                            <input class="form-check-input me-1" type="checkbox" name="frequency_weekdays" value="{{ day_value }}">{{ day_label }}
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
                 <div class="mb-4">
-                    <label class="form-label">Frequenza di invio (giorni)</label>
-                    <input type="number" name="frequency_days" class="form-control" required>
+                    <label class="form-label">Orario consegna (es. 07:30 o "dopo cena")</label>
+                    <input type="text" name="delivery_time" class="form-control" placeholder="07:30 oppure dopo cena">
                 </div>
                 <button type="submit" class="btn btn-primary w-100">Imposta Programma</button>
             </form>
@@ -37,7 +61,13 @@
                     <div>
                         <strong>{{ schedule.book.title }}</strong>
                         <br>
-                        <small class="text-muted">Frequenza: ogni {{ schedule.frequency_days }} giorni</small>
+                        <small class="text-muted">Frequenza: {{ describe_frequency(schedule) }}</small>
+                        <br>
+                        <small class="text-muted">Orario: {{ schedule.delivery_time.strftime('%H:%M') if schedule.delivery_time else '08:00 (default)' }}</small>
+                        {% if schedule.travel_pause_until %}
+                        <br>
+                        <small class="text-warning">Modalità viaggio fino al {{ schedule.travel_pause_until.strftime('%d/%m/%Y %H:%M') }}</small>
+                        {% endif %}
                     </div>
                     <div class="d-flex gap-2">
                         <form action="{{ url_for('app_routes.pause_schedule', schedule_id=schedule.id) }}" method="post" class="d-inline">
@@ -47,6 +77,18 @@
                         </form>
                         <form action="{{ url_for('app_routes.delete_schedule', schedule_id=schedule.id) }}" method="post" class="d-inline">
                             <button type="submit" class="btn btn-danger btn-sm"><i class="bi bi-trash"></i> Cancella</button>
+                        </form>
+                    </div>
+                    <div class="w-100 d-flex flex-wrap gap-2 mt-2">
+                        <form action="{{ url_for('app_routes.snooze_next_schedule', schedule_id=schedule.id) }}" method="post" class="d-inline">
+                            <button type="submit" class="btn btn-outline-primary btn-sm">Salta prossima consegna</button>
+                        </form>
+                        <form action="{{ url_for('app_routes.snooze_24h_schedule', schedule_id=schedule.id) }}" method="post" class="d-inline">
+                            <button type="submit" class="btn btn-outline-primary btn-sm">Rimanda di 24h</button>
+                        </form>
+                        <form action="{{ url_for('app_routes.travel_mode_schedule', schedule_id=schedule.id) }}" method="post" class="d-flex gap-2 align-items-center">
+                            <input type="number" name="travel_days" class="form-control form-control-sm" min="1" value="7" style="max-width: 90px;">
+                            <button type="submit" class="btn btn-outline-warning btn-sm">Modalità viaggio</button>
                         </form>
                     </div>
                 </li>
