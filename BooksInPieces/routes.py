@@ -8,11 +8,11 @@ from extensions import db
 from models import User, Book, ReadingSchedule, DeliveryEvent
 from email_sender import send_next_book_part, send_password_reset_email
 from config import Config
-from schedule_utils import parse_delivery_time, compute_next_send_date, WEEKDAY_CHOICES, describe_frequency
 from schedule_utils import (
     parse_time_str,
     serialize_weekdays,
     compute_next_send_datetime_from_params,
+    compute_next_send_datetime,
     FREQ_EVERY_N_DAYS,
     FREQ_DAILY,
     FREQ_WEEKDAYS,
@@ -25,6 +25,32 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 ALLOWED_EXTENSIONS = {"txt", "html", "htm"}
 
 app_routes = Blueprint("app_routes", __name__)
+
+WEEKDAY_CHOICES = {"0", "1", "2", "3", "4", "5", "6"}
+
+
+def describe_frequency(schedule):
+    frequency_type = schedule.frequency_type or FREQ_EVERY_N_DAYS
+    if frequency_type == FREQ_DAILY:
+        return "Giornaliera"
+    if frequency_type == FREQ_WEEKEND:
+        return "Weekend"
+    if frequency_type == FREQ_WEEKDAYS:
+        weekdays = schedule.weekdays or "0,1,2,3,4"
+        labels = ["Lun", "Mar", "Mer", "Gio", "Ven", "Sab", "Dom"]
+        selected = []
+        for token in weekdays.split(","):
+            token = token.strip()
+            if token.isdigit():
+                idx = int(token)
+                if 0 <= idx < len(labels):
+                    selected.append(labels[idx])
+        return "Giorni: " + ", ".join(selected) if selected else "Giorni specifici"
+
+    days = max(int(schedule.frequency_days or 1), 1)
+    if days == 1:
+        return "Ogni giorno"
+    return f"Ogni {days} giorni"
 
 
 def _count_book_words(schedule):
@@ -215,20 +241,13 @@ def select_book():
     if request.method == "POST":
         book_id = request.form["book_id"]
         minutes_per_reading = int(request.form["minutes_per_reading"])
-        frequency_mode = request.form.get("frequency_mode", "interval")
-        frequency_days = int(request.form.get("frequency_days", 1) or 1)
-        selected_weekdays = request.form.getlist("frequency_weekdays")
-        frequency_weekdays = ",".join(day for day in selected_weekdays if day in WEEKDAY_CHOICES)
-        delivery_time = parse_delivery_time(request.form.get("delivery_time", ""))
-
-        if request.form.get("delivery_time") and delivery_time is None:
-            flash("Orario non valido. Usa formato HH:MM (es. 07:30) oppure etichette come 'dopo cena'.")
-            return redirect(url_for("app_routes.select_book"))
         words_per_minute = int(request.form.get("words_per_minute", 200))
-        frequency_type = request.form.get("frequency_type", FREQ_EVERY_N_DAYS)
-        frequency_days = int(request.form.get("frequency_days", 1))
+        frequency_type = request.form.get("frequency_type") or request.form.get("frequency_mode", FREQ_EVERY_N_DAYS)
+        if frequency_type == "interval":
+            frequency_type = FREQ_EVERY_N_DAYS
+        frequency_days = int(request.form.get("frequency_days", 1) or 1)
         delivery_time = parse_time_str(request.form.get("delivery_time"))
-        weekdays_selected = request.form.getlist("weekdays")
+        weekdays_selected = request.form.getlist("weekdays") or request.form.getlist("frequency_weekdays")
 
         if any(not schedule.is_paused for schedule in active_schedules):
             flash("Hai già una sottoscrizione attiva. Mettila in pausa o cancellala prima di aggiungerne un'altra.")
@@ -266,10 +285,8 @@ def select_book():
             minutes_per_reading=minutes_per_reading,
             frequency_type=frequency_type,
             frequency_days=frequency_days,
-            frequency_mode=frequency_mode,
-            frequency_weekdays=frequency_weekdays,
-            delivery_time=delivery_time,
-            next_send_date=datetime.datetime.utcnow(),
+            frequency_mode=frequency_type,
+            frequency_weekdays=weekdays,
             weekdays=weekdays,
             delivery_time=delivery_time,
             next_send_date=next_send_date,
@@ -403,13 +420,7 @@ def snooze_next_schedule(schedule_id):
 
     now = datetime.datetime.utcnow()
     reference = max(schedule.next_send_date, now)
-    schedule.next_send_date = compute_next_send_date(
-        reference,
-        schedule.frequency_mode,
-        schedule.frequency_days,
-        schedule.frequency_weekdays,
-        schedule.delivery_time,
-    )
+    schedule.next_send_date = compute_next_send_datetime(reference, schedule, allow_immediate=False)
     db.session.add(DeliveryEvent(
         schedule_id=schedule.id,
         event_type="skipped",

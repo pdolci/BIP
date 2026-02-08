@@ -296,7 +296,7 @@ def send_next_book_part(schedule_id):
 
     try:
         schedule.last_sent_index = new_index
-        schedule.next_send_date = datetime.datetime.utcnow() + datetime.timedelta(days=schedule.frequency_days)
+        schedule.next_send_date = compute_next_send_datetime(datetime.datetime.utcnow(), schedule, allow_immediate=False)
         db.session.commit()  # Removed unnecessary add()
         logging.info(f"✅ Database aggiornato per l'utente {user.email}")
     except Exception as e:
