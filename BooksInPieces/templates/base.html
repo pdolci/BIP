@@ -3,51 +3,62 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gestione Libri</title>
+    <title>Books in Pieces</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
 </head>
 <body>
-    <nav class="navbar navbar-expand-lg navbar-dark">
-        <div class="container-fluid">
-            <a class="navbar-brand" href="{{ url_for('app_routes.index') }}">📚 Biblioteca</a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="#navbarNav" aria-expanded="false" aria-label="Toggle navigation">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="#navbarNav">
-                <ul class="navbar-nav ms-auto">
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('app_routes.index') }}">🏠 Home</a>
-                    </li>
-                    {% if 'user_id' in session %}
+    <div class="site-shell">
+        <nav class="navbar navbar-expand-lg navbar-dark">
+            <div class="container-fluid px-lg-4">
+                <a class="navbar-brand" href="{{ url_for('app_routes.index') }}">📚 Books in Pieces</a>
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+                <div class="collapse navbar-collapse" id="navbarNav">
+                    <ul class="navbar-nav ms-auto gap-lg-2">
                         <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('app_routes.select_book') }}">📖 I Miei Libri</a>
+                            <a class="nav-link" href="{{ url_for('app_routes.index') }}">Home</a>
                         </li>
-                        {% if session.get('is_admin') %}
+                        {% if 'user_id' in session %}
                             <li class="nav-item">
-                                <a class="nav-link" href="{{ url_for('app_routes.manage_books') }}">⚙️ Gestione Libri</a>
+                                <a class="nav-link" href="{{ url_for('app_routes.select_book') }}">I miei libri</a>
+                            </li>
+                            {% if session.get('is_admin') %}
+                                <li class="nav-item">
+                                    <a class="nav-link" href="{{ url_for('app_routes.manage_books') }}">Gestione libri</a>
+                                </li>
+                            {% endif %}
+                            <li class="nav-item">
+                                <a class="nav-link" href="{{ url_for('app_routes.logout') }}">Logout</a>
+                            </li>
+                        {% else %}
+                            <li class="nav-item">
+                                <a class="nav-link" href="{{ url_for('app_routes.register') }}">Registrati</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="{{ url_for('app_routes.login') }}">Login</a>
                             </li>
                         {% endif %}
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('app_routes.logout') }}">🚪 Logout</a>
-                        </li>
-                    {% else %}
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('app_routes.register') }}">📝 Registrati</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('app_routes.login') }}">🔑 Login</a>
-                        </li>
-                    {% endif %}
-                </ul>
+                    </ul>
+                </div>
             </div>
-        </div>
-    </nav>
-    
-    <div class="container mt-4">
-        {% block content %}{% endblock %}
+        </nav>
+
+        <main class="page-wrap">
+            {% with messages = get_flashed_messages() %}
+                {% if messages %}
+                    <div class="mb-4">
+                        {% for message in messages %}
+                            <div class="alert alert-info" role="alert">{{ message }}</div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+            {% block content %}{% endblock %}
+        </main>
     </div>
-    
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
