@@ -9,6 +9,9 @@ from models import ReadingSchedule, Book, User
 from config import Config
 import chardet
 
+ANSI_ESCAPE_RE = re.compile(r"\x1B(?:\[[0-?]*[ -/]*[@-~]|[@-Z\\-_])")
+CONTROL_CHARS_RE = re.compile(r"[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]")
+
 def send_email(to, subject, body, html_body=None):
     """ Invia una email e logga eventuali errori """
     try:
@@ -36,12 +39,21 @@ class ContentChunk:
 
 def html_to_text(content):
     """Converte un contenuto HTML in testo leggibile."""
+    content = sanitize_source_text(content)
     content = re.sub(r"<script.*?>.*?</script>", "", content, flags=re.IGNORECASE | re.DOTALL)
     content = re.sub(r"<style.*?>.*?</style>", "", content, flags=re.IGNORECASE | re.DOTALL)
     content = re.sub(r"</?(p|div|h[1-6]|li|ul|ol|blockquote|section|article|br)\b[^>]*>", "\n", content, flags=re.IGNORECASE)
     content = re.sub(r"<[^>]+>", "", content)
     content = html.unescape(content)
     return re.sub(r"\n\s*\n+", "\n\n", content).strip()
+
+
+def sanitize_source_text(content):
+    """Rimuove sequenze ANSI e caratteri di controllo preservando il layout testuale."""
+    normalized = content.replace("\r\n", "\n").replace("\r", "\n")
+    normalized = ANSI_ESCAPE_RE.sub("", normalized)
+    normalized = CONTROL_CHARS_RE.sub("", normalized)
+    return normalized
 
 
 def build_email_bodies(chunk, is_html_source=False):
@@ -165,17 +177,17 @@ def detect_encoding(file_path):
     with open(file_path, "rb") as f:
         raw_data = f.read(10000)  # Legge un pezzo di file per determinare l'encoding
         result = chardet.detect(raw_data)
-        return result["encoding"]
+        return result["encoding"] or "utf-8"
 
 
 def read_file_chunk(file_path, start_idx, length):
     """Reads a chunk of the book file starting from `start_idx`, ensuring correct word count while preserving original formatting and ending at a full sentence."""
     try:
         encoding = detect_encoding(file_path)  # ✅ Detect file encoding
-        with open(file_path, 'r', encoding=encoding) as file:
+        with open(file_path, 'r', encoding=encoding, errors='replace') as file:
             logging.info(f"📖 File aperto con successo: {file_path}, partendo da {start_idx}")
 
-            source_content = file.read()
+            source_content = sanitize_source_text(file.read())
             source_is_html = is_html_file(file_path)
             if source_is_html:
                 chunk, new_index = extract_html_chunk(source_content, start_idx, length)
