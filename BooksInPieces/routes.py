@@ -7,6 +7,15 @@ from extensions import db
 from models import User, Book, ReadingSchedule
 from email_sender import send_next_book_part, send_password_reset_email
 from config import Config
+from schedule_utils import (
+    parse_time_str,
+    serialize_weekdays,
+    compute_next_send_datetime_from_params,
+    FREQ_EVERY_N_DAYS,
+    FREQ_DAILY,
+    FREQ_WEEKDAYS,
+    FREQ_WEEKEND,
+)
 import logging
 
 UPLOAD_FOLDER = Config.UPLOAD_FOLDER
@@ -131,18 +140,51 @@ def select_book():
     if request.method == "POST":
         book_id = request.form["book_id"]
         minutes_per_reading = int(request.form["minutes_per_reading"])
-        frequency_days = int(request.form["frequency_days"])
+        words_per_minute = int(request.form.get("words_per_minute", 200))
+        frequency_type = request.form.get("frequency_type", FREQ_EVERY_N_DAYS)
+        frequency_days = int(request.form.get("frequency_days", 1))
+        delivery_time = parse_time_str(request.form.get("delivery_time"))
+        weekdays_selected = request.form.getlist("weekdays")
 
         if any(not schedule.is_paused for schedule in active_schedules):
             flash("Hai già una sottoscrizione attiva. Mettila in pausa o cancellala prima di aggiungerne un'altra.")
             return redirect(url_for("app_routes.select_book"))
 
+        if frequency_type == FREQ_WEEKDAYS and not weekdays_selected:
+            flash("Seleziona almeno un giorno della settimana.")
+            return redirect(url_for("app_routes.select_book"))
+
+        if frequency_type != FREQ_EVERY_N_DAYS:
+            frequency_days = 1
+
+        weekdays = None
+        if frequency_type == FREQ_WEEKDAYS:
+            weekdays = serialize_weekdays(
+                [int(day) for day in weekdays_selected if day.isdigit()]
+            )
+        elif frequency_type == FREQ_WEEKEND:
+            weekdays = serialize_weekdays([5, 6])
+
+        now = datetime.datetime.utcnow()
+        next_send_date = compute_next_send_datetime_from_params(
+            now,
+            frequency_type,
+            frequency_days,
+            weekdays,
+            delivery_time,
+            allow_immediate=True,
+        )
+
         schedule = ReadingSchedule(
             user_id=user_id,
             book_id=book_id,
+            words_per_minute=words_per_minute,
             minutes_per_reading=minutes_per_reading,
+            frequency_type=frequency_type,
             frequency_days=frequency_days,
-            next_send_date=datetime.datetime.utcnow(),
+            weekdays=weekdays,
+            delivery_time=delivery_time,
+            next_send_date=next_send_date,
             is_paused=False
         )
         db.session.add(schedule)
@@ -152,6 +194,89 @@ def select_book():
 
     books = Book.query.all()
     return render_template("select_book.html", books=books, active_schedules=active_schedules)
+
+
+@app_routes.route("/snooze_schedule/<int:schedule_id>", methods=["POST"])
+def snooze_schedule(schedule_id):
+    if "user_id" not in session:
+        flash("Devi effettuare il login per modificare la tua sottoscrizione.")
+        return redirect(url_for("app_routes.login"))
+
+    schedule = ReadingSchedule.query.get(schedule_id)
+    if not schedule or schedule.user_id != session["user_id"]:
+        flash("Operazione non consentita.")
+        return redirect(url_for("app_routes.select_book"))
+
+    action = request.form.get("action")
+    now = datetime.datetime.utcnow()
+
+    if action == "skip_next":
+        schedule.skip_next = True
+        schedule.snooze_until = None
+        flash("La prossima consegna sarà saltata.")
+    elif action == "delay_24h":
+        base_time = schedule.next_send_date if schedule.next_send_date and schedule.next_send_date > now else now
+        schedule.snooze_until = base_time + datetime.timedelta(hours=24)
+        schedule.next_send_date = schedule.snooze_until
+        schedule.skip_next = False
+        flash("Consegna rimandata di 24 ore.")
+    else:
+        flash("Azione di snooze non valida.")
+
+    db.session.commit()
+    return redirect(url_for("app_routes.select_book"))
+
+
+@app_routes.route("/travel_mode/<int:schedule_id>", methods=["POST"])
+def travel_mode(schedule_id):
+    if "user_id" not in session:
+        flash("Devi effettuare il login per modificare la tua sottoscrizione.")
+        return redirect(url_for("app_routes.login"))
+
+    schedule = ReadingSchedule.query.get(schedule_id)
+    if not schedule or schedule.user_id != session["user_id"]:
+        flash("Operazione non consentita.")
+        return redirect(url_for("app_routes.select_book"))
+
+    action = request.form.get("action")
+    now = datetime.datetime.utcnow()
+
+    if action == "clear":
+        schedule.travel_pause_until = None
+        flash("Modalità viaggio disattivata.")
+        db.session.commit()
+        return redirect(url_for("app_routes.select_book"))
+
+    resume_date_raw = request.form.get("resume_date")
+    resume_time_raw = request.form.get("resume_time")
+
+    if not resume_date_raw:
+        flash("Seleziona una data di ripartenza.")
+        return redirect(url_for("app_routes.select_book"))
+
+    try:
+        resume_date = datetime.date.fromisoformat(resume_date_raw)
+    except ValueError:
+        flash("Data di ripartenza non valida.")
+        return redirect(url_for("app_routes.select_book"))
+
+    resume_time = parse_time_str(resume_time_raw)
+    if resume_time is None:
+        resume_time = schedule.delivery_time or datetime.time(9, 0)
+
+    resume_at = datetime.datetime.combine(resume_date, resume_time)
+
+    if resume_at <= now:
+        flash("La ripartenza deve essere nel futuro.")
+        return redirect(url_for("app_routes.select_book"))
+
+    schedule.travel_pause_until = resume_at
+    if schedule.next_send_date is None or schedule.next_send_date < resume_at:
+        schedule.next_send_date = resume_at
+
+    db.session.commit()
+    flash("Modalità viaggio attivata.")
+    return redirect(url_for("app_routes.select_book"))
 
 @app_routes.route("/pause_schedule/<int:schedule_id>", methods=["POST"])
 def pause_schedule(schedule_id):

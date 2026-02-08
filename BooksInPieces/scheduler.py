@@ -1,10 +1,11 @@
 import logging
 from apscheduler.schedulers.background import BackgroundScheduler
-from datetime import datetime, UTC
+import datetime
 from flask import Flask
 from models import ReadingSchedule
 from extensions import db
 from email_sender import send_next_book_part
+from schedule_utils import compute_next_send_datetime
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
@@ -15,7 +16,7 @@ def check_scheduled_emails(app: Flask):
     logging.info("✅ Job check_scheduled_emails AVVIATO")
 
     with app.app_context():  # ✅ Creiamo manualmente il contesto Flask
-        now = datetime.now(UTC)
+        now = datetime.datetime.utcnow()
         logging.info(f"🕒 Checking schedules at {now}")
         
         db.session.expire_all()
@@ -38,6 +39,41 @@ def check_scheduled_emails(app: Flask):
 
         for schedule in schedules:
             logging.info(f"📨 Inviando email per il libro ID {schedule.book_id} all'utente {schedule.user_id}")
+            needs_commit = False
+
+            if schedule.travel_pause_until and now < schedule.travel_pause_until:
+                if schedule.next_send_date and schedule.next_send_date < schedule.travel_pause_until:
+                    schedule.next_send_date = schedule.travel_pause_until
+                    needs_commit = True
+                if needs_commit:
+                    db.session.commit()
+                continue
+
+            if schedule.travel_pause_until and now >= schedule.travel_pause_until:
+                schedule.travel_pause_until = None
+                needs_commit = True
+
+            if schedule.snooze_until and now < schedule.snooze_until:
+                if schedule.next_send_date and schedule.next_send_date < schedule.snooze_until:
+                    schedule.next_send_date = schedule.snooze_until
+                    needs_commit = True
+                if needs_commit:
+                    db.session.commit()
+                continue
+
+            if schedule.snooze_until and now >= schedule.snooze_until:
+                schedule.snooze_until = None
+                needs_commit = True
+
+            if schedule.skip_next:
+                schedule.skip_next = False
+                schedule.next_send_date = compute_next_send_datetime(now, schedule, allow_immediate=False)
+                db.session.commit()
+                continue
+
+            if needs_commit:
+                db.session.commit()
+
             send_next_book_part(schedule.id)
 
     logging.info("✅ Job check_scheduled_emails COMPLETATO")
