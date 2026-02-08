@@ -97,3 +97,15 @@ body {
 .section-title {
     font-weight: 700;
 }
+
+.dashboard-card .metric-box {
+    background: #f8fbff;
+    border: 1px solid #d9e6f7;
+    border-radius: 12px;
+    padding: 1rem;
+}
+
+.dashboard-card .metric-box h4 {
+    margin: 0.3rem 0;
+    font-weight: 700;
+}

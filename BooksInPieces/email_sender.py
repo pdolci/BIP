@@ -5,7 +5,7 @@ import re
 from dataclasses import dataclass
 from flask_mail import Message
 from extensions import mail, db
-from models import ReadingSchedule, Book, User
+from models import ReadingSchedule, Book, User, DeliveryEvent
 from config import Config
 from schedule_utils import compute_next_send_date
 import chardet
@@ -181,6 +181,26 @@ def detect_encoding(file_path):
         return result["encoding"] or "utf-8"
 
 
+
+
+def count_total_words(file_path):
+    """Conta il totale parole del contenuto sorgente per metriche progresso/capitolo."""
+    try:
+        encoding = detect_encoding(file_path)
+        with open(file_path, 'r', encoding=encoding, errors='replace') as file:
+            content = sanitize_source_text(file.read())
+            if is_html_file(file_path):
+                content = html_to_text(content)
+            return len(re.findall(r"\S+", content))
+    except Exception as error:
+        logging.warning(f"⚠️ Impossibile contare parole file {file_path}: {error}")
+        return 0
+
+
+def build_email_subject(book_title, part_number, completion_percent):
+    return f"{book_title} • Parte {part_number} – ~{completion_percent}%"
+
+
 def read_file_chunk(file_path, start_idx, length):
     """Reads a chunk of the book file starting from `start_idx`, ensuring correct word count while preserving original formatting and ending at a full sentence."""
     try:
@@ -252,8 +272,21 @@ def send_next_book_part(schedule_id):
         logging.info("⚠️ Nessun altro testo da inviare, fine della lettura.")
         return
 
+    words_sent = max(new_index - schedule.last_sent_index, 0)
+    total_words = count_total_words(file_path)
+    part_number = max(1, (schedule.last_sent_index // max(schedule.words_per_minute * schedule.minutes_per_reading, 1)) + 1)
+    completion_percent = int(round((new_index / total_words) * 100)) if total_words else 0
+
     text_body, html_body = build_email_bodies(chunk, is_html_source=source_is_html)
-    send_email(user.email, f"{book.title} - Nuova lettura", text_body, html_body=html_body)
+    progress_header = f"Parte {part_number} – ~{completion_percent}%"
+    text_body = f"{progress_header}\n\n{text_body}"
+    html_body = (
+        "<div style='font-family: Arial, sans-serif; color: #334155; margin-bottom: 16px; font-weight: 600;'>"
+        f"{html.escape(progress_header)}"
+        "</div>" + html_body
+    )
+
+    send_email(user.email, build_email_subject(book.title, part_number, completion_percent), text_body, html_body=html_body)
 
     # Instead of sending an email, print the chunk
     #logging.info(f"📖 Chunk for {user.email} - {book.title}:")
@@ -262,6 +295,14 @@ def send_next_book_part(schedule_id):
     #print("="*50 + "\n")
 
     try:
+        db.session.add(DeliveryEvent(
+            schedule_id=schedule.id,
+            event_type="sent",
+            words_count=words_sent,
+            start_word_index=schedule.last_sent_index,
+            end_word_index=new_index,
+            note=progress_header,
+        ))
         schedule.last_sent_index = new_index
         schedule.next_send_date = compute_next_send_date(
             datetime.datetime.utcnow(),
