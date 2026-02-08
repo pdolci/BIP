@@ -2,7 +2,7 @@ from flask import Flask
 from config import Config
 from extensions import db, mail, migrate
 from routes import app_routes
-from scheduler import start_scheduler
+import scheduler as scheduler_module
 import atexit
 
 app = Flask(__name__)
@@ -18,9 +18,15 @@ app.register_blueprint(app_routes)
 
 # ✅ Passiamo `app` allo scheduler per evitare import circolari
 with app.app_context():
-    start_scheduler(app)
+    scheduler_module.start_scheduler(app)
 
-atexit.register(lambda: scheduler.shutdown())
+
+def shutdown_scheduler():
+    if scheduler_module.scheduler:
+        scheduler_module.scheduler.shutdown()
+
+
+atexit.register(shutdown_scheduler)
 
 if __name__ == "__main__":
     app.run(debug=True, use_reloader=False)
