@@ -1,6 +1,7 @@
 import os
 from extensions import db
 from werkzeug.security import generate_password_hash, check_password_hash
+from config import Config
 
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -24,8 +25,7 @@ class Book(db.Model):
 
     def get_absolute_path(self):
         """Returns the absolute file path of the book."""
-        base_dir = os.getcwd()  # Gets the current working directory
-        return os.path.join(base_dir, "uploads", "books", self.file_path)
+        return os.path.join(Config.UPLOAD_FOLDER, self.file_path)
 
 class ReadingSchedule(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -38,4 +38,3 @@ class ReadingSchedule(db.Model):
     next_send_date = db.Column(db.DateTime, nullable=False)
     is_paused = db.Column(db.Boolean, default=False) 
     book = db.relationship("Book", backref="schedules", lazy=True)
-
