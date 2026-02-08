@@ -1,55 +1,58 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="container d-flex justify-content-center align-items-center flex-column" style="min-height: 80vh;">
-    <div class="card shadow-lg p-4 mb-4" style="max-width: 500px; width: 100%;">
-        <h2 class="text-center mb-4">📖 Seleziona un Libro</h2>
-        <form method="POST">
-            <div class="mb-3">
-                <label class="form-label">Scegli un libro:</label>
-                <select name="book_id" class="form-select" required>
-                    {% for book in books %}
-                        <option value="{{ book.id }}">{{ book.title }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="mb-3">
-                <label class="form-label">Minuti per sessione di lettura:</label>
-                <input type="number" name="minutes_per_reading" class="form-control" required>
-            </div>
-            <div class="mb-3">
-                <label class="form-label">Frequenza di invio (giorni):</label>
-                <input type="number" name="frequency_days" class="form-control" required>
-            </div>
-            <button type="submit" class="btn btn-primary w-100">Imposta Programma</button>
-        </form>
+<div class="row justify-content-center g-4">
+    <div class="col-lg-7">
+        <div class="card panel-card p-4">
+            <h2 class="mb-4"><i class="bi bi-sliders me-2"></i>Configura la tua lettura</h2>
+            <form method="POST">
+                <div class="mb-3">
+                    <label class="form-label">Scegli un libro</label>
+                    <select name="book_id" class="form-select" required>
+                        {% for book in books %}
+                            <option value="{{ book.id }}">{{ book.title }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Minuti per sessione di lettura</label>
+                    <input type="number" name="minutes_per_reading" class="form-control" required>
+                </div>
+                <div class="mb-4">
+                    <label class="form-label">Frequenza di invio (giorni)</label>
+                    <input type="number" name="frequency_days" class="form-control" required>
+                </div>
+                <button type="submit" class="btn btn-primary w-100">Imposta Programma</button>
+            </form>
+        </div>
     </div>
 
-    <!-- Sezione Schedules Attivi -->
     {% if active_schedules %}
-    <div class="card shadow-lg p-4" style="max-width: 600px; width: 100%;">
-        <h3 class="text-center mb-3">📆 Sottoscrizioni Attive</h3>
-        <ul class="list-group">
-            {% for schedule in active_schedules %}
-            <li class="list-group-item d-flex justify-content-between align-items-center">
-                <div>
-                    <strong>{{ schedule.book.title }}</strong>
-                    <br>
-                    <small>Frequenza: ogni {{ schedule.frequency_days }} giorni</small>
-                </div>
-                <div>
-                    <form action="{{ url_for('app_routes.pause_schedule', schedule_id=schedule.id) }}" method="post" class="d-inline">
-                        <button type="submit" class="btn btn-warning btn-sm">
-                            {% if schedule.is_paused %}▶ Riprendi{% else %}⏸ Pausa{% endif %}
-                        </button>
-                    </form>
-                    <form action="{{ url_for('app_routes.delete_schedule', schedule_id=schedule.id) }}" method="post" class="d-inline">
-                        <button type="submit" class="btn btn-danger btn-sm">❌ Cancella</button>
-                    </form>
-                </div>
-            </li>
-            {% endfor %}
-        </ul>
+    <div class="col-lg-8">
+        <div class="card panel-card p-4">
+            <h3 class="mb-3"><i class="bi bi-calendar3 me-2"></i>Sottoscrizioni Attive</h3>
+            <ul class="list-group list-group-flush">
+                {% for schedule in active_schedules %}
+                <li class="list-group-item py-3 d-flex flex-wrap justify-content-between align-items-center gap-3">
+                    <div>
+                        <strong>{{ schedule.book.title }}</strong>
+                        <br>
+                        <small class="text-muted">Frequenza: ogni {{ schedule.frequency_days }} giorni</small>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <form action="{{ url_for('app_routes.pause_schedule', schedule_id=schedule.id) }}" method="post" class="d-inline">
+                            <button type="submit" class="btn btn-warning btn-sm">
+                                {% if schedule.is_paused %}<i class="bi bi-play-fill"></i> Riprendi{% else %}<i class="bi bi-pause-fill"></i> Pausa{% endif %}
+                            </button>
+                        </form>
+                        <form action="{{ url_for('app_routes.delete_schedule', schedule_id=schedule.id) }}" method="post" class="d-inline">
+                            <button type="submit" class="btn btn-danger btn-sm"><i class="bi bi-trash"></i> Cancella</button>
+                        </form>
+                    </div>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
     </div>
     {% endif %}
 </div>

@@ -1,62 +1,67 @@
-### Updated admin_books.html
 {% extends "base.html" %}
 
 {% block content %}
-<div class="container mt-5">
-    <h1 class="text-center mb-4">📚 Gestione Libri</h1>
-
-    <div class="card shadow-lg p-4">
-        <h3 class="mb-3">Carica un nuovo libro</h3>
-        <form action="{{ url_for('app_routes.upload_book') }}" method="post" enctype="multipart/form-data">
-            <div class="mb-3">
-                <label for="title" class="form-label">Titolo:</label>
-                <input type="text" name="title" required class="form-control">
-            </div>
-            
-            <div class="mb-3">
-                <label for="short_description" class="form-label">Descrizione breve:</label>
-                <textarea name="short_description" rows="2" class="form-control"></textarea>
-            </div>
-            
-            <div class="mb-3">
-                <label for="book_file" class="form-label">Seleziona un file:</label>
-                <input type="file" name="book_file" required class="form-control">
-            </div>
-            
-            <button type="submit" class="btn btn-primary btn-lg w-100">📤 Carica Libro</button>
-        </form>
+<div class="row g-4">
+    <div class="col-12">
+        <h1 class="section-title"><i class="bi bi-collection me-2"></i>Gestione Libri</h1>
     </div>
 
-    <hr class="my-5">
+    <div class="col-lg-5">
+        <div class="card panel-card p-4 h-100">
+            <h3 class="mb-3">Carica un nuovo libro</h3>
+            <form action="{{ url_for('app_routes.upload_book') }}" method="post" enctype="multipart/form-data">
+                <div class="mb-3">
+                    <label for="title" class="form-label">Titolo</label>
+                    <input type="text" name="title" required class="form-control">
+                </div>
 
-    <div class="card shadow-lg p-4">
-        <h3 class="mb-3 text-center">📖 Libri Caricati</h3>
-        <table class="table table-striped text-center">
-            <thead class="table-dark">
-                <tr>
-                    <th>Titolo</th>
-                    <th>Descrizione</th>
-                    <th>Azioni</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for book in books %}
-                <tr>
-                    <td><strong>{{ book.title }}</strong></td>
-                    <td>{{ book.short_description or "Nessuna descrizione" }}</td>
-                    <td>
-                        <form action="{{ url_for('app_routes.delete_book', book_id=book.id) }}" method="post" class="d-inline">
-                            <button type="submit" class="btn btn-danger btn-lg">🗑 Elimina</button>
-                        </form>
-                        
-                        <form action="{{ url_for('app_routes.toggle_book_status', book_id=book.id) }}" method="post" class="d-inline">
-                            <button type="submit" class="btn btn-warning btn-lg">{{ "🚫 Disattiva" if book.is_active else "✅ Attiva" }}</button>
-                        </form>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+                <div class="mb-3">
+                    <label for="short_description" class="form-label">Descrizione breve</label>
+                    <textarea name="short_description" rows="3" class="form-control"></textarea>
+                </div>
+
+                <div class="mb-4">
+                    <label for="book_file" class="form-label">File del libro</label>
+                    <input type="file" name="book_file" required class="form-control">
+                </div>
+
+                <button type="submit" class="btn btn-primary w-100"><i class="bi bi-upload me-2"></i>Carica Libro</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="col-lg-7">
+        <div class="card panel-card p-4 h-100">
+            <h3 class="mb-3">Libri Caricati</h3>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Titolo</th>
+                            <th>Descrizione</th>
+                            <th class="text-end">Azioni</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for book in books %}
+                        <tr>
+                            <td><strong>{{ book.title }}</strong></td>
+                            <td>{{ book.short_description or "Nessuna descrizione" }}</td>
+                            <td class="text-end">
+                                <form action="{{ url_for('app_routes.delete_book', book_id=book.id) }}" method="post" class="d-inline">
+                                    <button type="submit" class="btn btn-outline-danger btn-sm"><i class="bi bi-trash"></i> Elimina</button>
+                                </form>
+
+                                <form action="{{ url_for('app_routes.toggle_book_status', book_id=book.id) }}" method="post" class="d-inline">
+                                    <button type="submit" class="btn btn-outline-warning btn-sm">{{ "Disattiva" if book.is_active else "Attiva" }}</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
 </div>
 {% endblock %}
