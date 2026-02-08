@@ -108,3 +108,16 @@ def send_next_book_part(schedule_id):
     except Exception as e:
         db.session.rollback()
         logging.error(f"❌ Errore nel commit del database: {e}")
+
+
+
+
+def send_password_reset_email(user_email, reset_url):
+    """Invia l'email con link per il recupero password."""
+    subject = "Recupero password - BooksInPieces"
+    body = (
+        "Hai richiesto il recupero della password.\n\n"
+        f"Apri questo link per impostarne una nuova: {reset_url}\n\n"
+        "Se non hai richiesto tu questa operazione, ignora questa email."
+    )
+    send_email(user_email, subject, body)
