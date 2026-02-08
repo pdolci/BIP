@@ -52,6 +52,62 @@
     </div>
 
     {% if active_schedules %}
+
+    {% if dashboard %}
+    <div class="col-lg-10">
+        <div class="card panel-card p-4 dashboard-card">
+            <h3 class="mb-3"><i class="bi bi-speedometer2 me-2"></i>Dashboard Lettura</h3>
+            <div class="row g-3 mb-3">
+                <div class="col-md-4">
+                    <div class="metric-box">
+                        <small>Completamento</small>
+                        <h4>{{ dashboard.completion }}%</h4>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="metric-box">
+                        <small>Rimanenti stimati</small>
+                        <h4>{{ dashboard.remaining_words }} parole</h4>
+                        <small>~{{ dashboard.remaining_minutes }} min</small>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="metric-box">
+                        <small>Streak</small>
+                        <h4>{{ dashboard.streak_days }} giorni consecutivi</h4>
+                    </div>
+                </div>
+            </div>
+            <h5 class="mb-2">Storico consegne + cosa mi sono perso</h5>
+            <ul class="list-group list-group-flush">
+                {% for item in dashboard.history %}
+                <li class="list-group-item d-flex justify-content-between align-items-start">
+                    <div>
+                        <strong>{{ item.book_title }}</strong>
+                        <div class="text-muted small">{{ item.created_at.strftime('%d/%m/%Y %H:%M') }}</div>
+                        <div>
+                            {% if item.event_type == 'sent' %}
+                                ✅ Consegna inviata ({{ item.words_count }} parole)
+                            {% elif item.event_type == 'skipped' %}
+                                ⚠️ Persa/saltata: {{ item.note }}
+                            {% elif item.event_type == 'paused' %}
+                                ⏸️ {{ item.note }}
+                            {% elif item.event_type == 'resumed' %}
+                                ▶️ {{ item.note }}
+                            {% else %}
+                                {{ item.note or item.event_type }}
+                            {% endif %}
+                        </div>
+                    </div>
+                </li>
+                {% else %}
+                <li class="list-group-item text-muted">Nessun evento disponibile.</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+    {% endif %}
+
     <div class="col-lg-8">
         <div class="card panel-card p-4">
             <h3 class="mb-3"><i class="bi bi-calendar3 me-2"></i>Sottoscrizioni Attive</h3>

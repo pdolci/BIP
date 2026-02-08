@@ -42,3 +42,16 @@ class ReadingSchedule(db.Model):
     is_paused = db.Column(db.Boolean, default=False) 
     travel_pause_until = db.Column(db.DateTime, nullable=True)
     book = db.relationship("Book", backref="schedules", lazy=True)
+
+
+class DeliveryEvent(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    schedule_id = db.Column(db.Integer, db.ForeignKey("reading_schedule.id"), nullable=False)
+    event_type = db.Column(db.String(20), nullable=False, default="sent")
+    words_count = db.Column(db.Integer, nullable=False, default=0)
+    start_word_index = db.Column(db.Integer, nullable=True)
+    end_word_index = db.Column(db.Integer, nullable=True)
+    note = db.Column(db.String(255), nullable=True)
+    created_at = db.Column(db.DateTime, default=db.func.current_timestamp(), nullable=False)
+
+    schedule = db.relationship("ReadingSchedule", backref="delivery_events", lazy=True)
