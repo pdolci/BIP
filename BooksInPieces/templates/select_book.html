@@ -20,24 +20,24 @@
                 </div>
                 <div class="mb-3">
                     <label class="form-label">Frequenza di invio</label>
-                    <select name="frequency_mode" class="form-select">
-                        <option value="interval">Ogni N giorni</option>
+                    <select name="frequency_type" id="frequency-type" class="form-select">
+                        <option value="every_n_days">Ogni N giorni</option>
                         <option value="daily">Giornaliera</option>
                         <option value="weekdays">Giorni specifici</option>
                         <option value="weekend">Solo weekend</option>
                     </select>
                 </div>
-                <div class="mb-3">
+                <div class="mb-3" id="frequency-days-group">
                     <label class="form-label">Ogni quanti giorni (se scegli "Ogni N giorni")</label>
                     <input type="number" name="frequency_days" class="form-control" value="1" min="1">
                 </div>
-                <div class="mb-3">
+                <div class="mb-3 d-none" id="weekdays-group">
                     <label class="form-label">Giorni specifici (Lun/Mer/Ven...)</label>
                     <div class="d-flex flex-wrap gap-2">
                         {% set weekday_labels = [('0','Lun'),('1','Mar'),('2','Mer'),('3','Gio'),('4','Ven'),('5','Sab'),('6','Dom')] %}
                         {% for day_value, day_label in weekday_labels %}
                         <label class="btn btn-outline-secondary btn-sm">
-                            <input class="form-check-input me-1" type="checkbox" name="frequency_weekdays" value="{{ day_value }}">{{ day_label }}
+                            <input class="form-check-input me-1" type="checkbox" name="weekdays" value="{{ day_value }}">{{ day_label }}
                         </label>
                         {% endfor %}
                     </div>
