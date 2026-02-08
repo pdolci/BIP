@@ -7,6 +7,7 @@ from flask_mail import Message
 from extensions import mail, db
 from models import ReadingSchedule, Book, User
 from config import Config
+from schedule_utils import compute_next_send_date
 import chardet
 
 ANSI_ESCAPE_RE = re.compile(r"\x1B(?:\[[0-?]*[ -/]*[@-~]|[@-Z\\-_])")
@@ -262,7 +263,13 @@ def send_next_book_part(schedule_id):
 
     try:
         schedule.last_sent_index = new_index
-        schedule.next_send_date = datetime.datetime.utcnow() + datetime.timedelta(days=schedule.frequency_days)
+        schedule.next_send_date = compute_next_send_date(
+            datetime.datetime.utcnow(),
+            schedule.frequency_mode,
+            schedule.frequency_days,
+            schedule.frequency_weekdays,
+            schedule.delivery_time,
+        )
         db.session.commit()  # Removed unnecessary add()
         logging.info(f"✅ Database aggiornato per l'utente {user.email}")
     except Exception as e:
