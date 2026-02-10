@@ -2,18 +2,72 @@
 
 {% block content %}
 <div class="row justify-content-center g-4">
+    <div class="col-lg-10">
+        <div class="card panel-card p-4">
+            <h2 class="mb-3"><i class="bi bi-search me-2"></i>Ricerca e filtri libri</h2>
+            <form method="GET" class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label">Ricerca libera</label>
+                    <input type="text" name="q" class="form-control" value="{{ search_query }}" placeholder='es. "classici russi", "saggi brevi", "< 5 ore"'>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Autore</label>
+                    <input type="text" name="author" class="form-control" value="{{ filter_author }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Anno</label>
+                    <input type="number" name="year" class="form-control" value="{{ filter_year }}" min="0" max="2100">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Genere</label>
+                    <input type="text" name="genre" class="form-control" value="{{ filter_genre }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Tag</label>
+                    <input type="text" name="tags" class="form-control" value="{{ filter_tags }}" placeholder="es. russi, classici">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Lingua</label>
+                    <input type="text" name="language" class="form-control" value="{{ filter_language }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Tempo max (ore)</label>
+                    <input type="number" step="0.1" min="0" name="max_hours" class="form-control" value="{{ filter_max_hours }}">
+                </div>
+                <div class="col-12 d-flex gap-2">
+                    <button type="submit" class="btn btn-outline-primary"><i class="bi bi-funnel me-1"></i>Applica filtri</button>
+                    <a href="{{ url_for('app_routes.select_book') }}" class="btn btn-outline-secondary">Reset</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <div class="col-lg-7">
         <div class="card panel-card p-4">
             <h2 class="mb-4"><i class="bi bi-sliders me-2"></i>Configura la tua lettura</h2>
             <form method="POST">
                 <div class="mb-3">
-                    <label class="form-label">Scegli un libro</label>
+                    <label class="form-label">Scegli un libro ({{ books|length }} risultati)</label>
                     <select name="book_id" class="form-select" required>
                         {% for book in books %}
-                            <option value="{{ book.id }}">{{ book.title }}</option>
+                            <option value="{{ book.id }}">
+                                {{ book.title }}{% if book.author %} — {{ book.author }}{% endif %}{% if book.estimated_reading_hours %} · {{ book.estimated_reading_hours }}h{% endif %}
+                            </option>
                         {% endfor %}
                     </select>
                 </div>
+
+                {% if books %}
+                <div class="mb-3 small text-muted">
+                    {% set preview = books[0] %}
+                    <strong>Preview:</strong>
+                    {{ preview.author or 'Autore n/d' }} · {{ preview.publication_year or 'Anno n/d' }} · {{ preview.genre or 'Genere n/d' }} · {{ preview.language or 'Lingua n/d' }}
+                    {% if preview.tags %}<br>Tag: {{ preview.tags }}{% endif %}
+                </div>
+                {% else %}
+                <div class="alert alert-warning">Nessun libro trovato con i filtri selezionati.</div>
+                {% endif %}
+
                 <div class="mb-3">
                     <label class="form-label">Minuti per sessione di lettura</label>
                     <input type="number" name="minutes_per_reading" class="form-control" required>
@@ -46,7 +100,7 @@
                     <label class="form-label">Orario consegna (es. 07:30 o "dopo cena")</label>
                     <input type="text" name="delivery_time" class="form-control" placeholder="07:30 oppure dopo cena">
                 </div>
-                <button type="submit" class="btn btn-primary w-100">Imposta Programma</button>
+                <button type="submit" class="btn btn-primary w-100" {% if not books %}disabled{% endif %}>Imposta Programma</button>
             </form>
         </div>
     </div>

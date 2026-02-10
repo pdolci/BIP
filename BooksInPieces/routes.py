@@ -1,6 +1,7 @@
 import os
 import datetime
 import re
+from sqlalchemy import or_, and_
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash, send_from_directory
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 from werkzeug.utils import secure_filename
@@ -28,6 +29,66 @@ ALLOWED_EXTENSIONS = {"txt", "html", "htm"}
 app_routes = Blueprint("app_routes", __name__)
 
 WEEKDAY_CHOICES = {"0", "1", "2", "3", "4", "5", "6"}
+
+
+def _normalize_tags(tags_value):
+    if not tags_value:
+        return []
+    return [tag.strip() for tag in tags_value.split(",") if tag.strip()]
+
+
+def _build_book_filters(search_query, author, year, genre, tags, language, max_hours):
+    filters = []
+    normalized_query = (search_query or "").strip().lower()
+    tags_tokens = [token.strip() for token in (tags or "").split(",") if token.strip()]
+
+    if author:
+        filters.append(Book.author.ilike(f"%{author}%"))
+    if year and year.isdigit():
+        filters.append(Book.publication_year == int(year))
+    if genre:
+        filters.append(Book.genre.ilike(f"%{genre}%"))
+    if language:
+        filters.append(Book.language.ilike(f"%{language}%"))
+    if max_hours:
+        try:
+            filters.append(Book.estimated_reading_hours <= float(max_hours))
+        except ValueError:
+            pass
+
+    for tag in tags_tokens:
+        filters.append(Book.tags.ilike(f"%{tag}%"))
+
+    if normalized_query:
+        text_match = or_(
+            Book.title.ilike(f"%{normalized_query}%"),
+            Book.short_description.ilike(f"%{normalized_query}%"),
+            Book.author.ilike(f"%{normalized_query}%"),
+            Book.genre.ilike(f"%{normalized_query}%"),
+            Book.tags.ilike(f"%{normalized_query}%"),
+            Book.language.ilike(f"%{normalized_query}%"),
+        )
+
+        semantic_match = None
+        if "classici russi" in normalized_query:
+            semantic_match = and_(
+                or_(Book.genre.ilike("%classico%"), Book.tags.ilike("%classici%")),
+                or_(Book.tags.ilike("%russi%"), Book.language.ilike("%russo%")),
+            )
+        elif "saggi brevi" in normalized_query:
+            semantic_match = and_(
+                or_(Book.genre.ilike("%saggio%"), Book.tags.ilike("%saggi%")),
+                Book.estimated_reading_hours <= 5,
+            )
+
+        filters.append(or_(text_match, semantic_match) if semantic_match is not None else text_match)
+
+        hours_match = re.search(r"<\s*(\d+(?:[\.,]\d+)?)\s*ore", normalized_query)
+        if hours_match:
+            threshold = float(hours_match.group(1).replace(",", "."))
+            filters.append(Book.estimated_reading_hours <= threshold)
+
+    return filters
 
 
 def describe_frequency(schedule):
@@ -298,7 +359,28 @@ def select_book():
         flash("Programma di lettura impostato!")
         return redirect(url_for("app_routes.select_book"))
 
-    books = Book.query.all()
+    search_query = request.args.get("q", "").strip()
+    filter_author = request.args.get("author", "").strip()
+    filter_year = request.args.get("year", "").strip()
+    filter_genre = request.args.get("genre", "").strip()
+    filter_tags = request.args.get("tags", "").strip()
+    filter_language = request.args.get("language", "").strip()
+    filter_max_hours = request.args.get("max_hours", "").strip()
+
+    filters = _build_book_filters(
+        search_query,
+        filter_author,
+        filter_year,
+        filter_genre,
+        filter_tags,
+        filter_language,
+        filter_max_hours,
+    )
+    books_query = Book.query
+    if filters:
+        books_query = books_query.filter(*filters)
+    books = books_query.order_by(Book.title.asc()).all()
+
     dashboard = _build_dashboard(active_schedules)
     return render_template(
         "select_book.html",
@@ -306,6 +388,14 @@ def select_book():
         active_schedules=active_schedules,
         dashboard=dashboard,
         describe_frequency=describe_frequency,
+        search_query=search_query,
+        filter_author=filter_author,
+        filter_year=filter_year,
+        filter_genre=filter_genre,
+        filter_tags=filter_tags,
+        filter_language=filter_language,
+        filter_max_hours=filter_max_hours,
+        normalize_tags=_normalize_tags,
     )
 
 
@@ -527,6 +617,13 @@ def upload_book():
     file = request.files["book_file"]
     title = request.form.get("title")
     short_description = request.form.get("short_description")
+    author = request.form.get("author")
+    publication_year = request.form.get("publication_year")
+    genre = request.form.get("genre")
+    tags = request.form.get("tags")
+    language = request.form.get("language")
+    estimated_reading_hours = request.form.get("estimated_reading_hours")
+    cover_image = request.form.get("cover_image")
 
     if file.filename == "":
         flash("Nessun file scelto!")
@@ -547,7 +644,25 @@ def upload_book():
             return redirect(request.url)
 
         # Save book in database
-        new_book = Book(title=title, file_path=filename, is_active=True, short_description=short_description)
+        parsed_publication_year = int(publication_year) if publication_year and publication_year.isdigit() else None
+        try:
+            parsed_estimated_hours = float(estimated_reading_hours) if estimated_reading_hours else None
+        except ValueError:
+            parsed_estimated_hours = None
+
+        new_book = Book(
+            title=title,
+            file_path=filename,
+            is_active=True,
+            short_description=short_description,
+            author=author,
+            publication_year=parsed_publication_year,
+            genre=genre,
+            tags=tags,
+            language=language,
+            estimated_reading_hours=parsed_estimated_hours,
+            cover_image=cover_image,
+        )
         db.session.add(new_book)
         db.session.commit()
         flash("Libro caricato con successo!")

@@ -22,6 +22,13 @@ class Book(db.Model):
     file_path = db.Column(db.String(500), nullable=False)
     is_active = db.Column(db.Boolean, default=True)
     short_description = db.Column(db.Text, nullable=True)
+    author = db.Column(db.String(255), nullable=True)
+    publication_year = db.Column(db.Integer, nullable=True)
+    genre = db.Column(db.String(120), nullable=True)
+    tags = db.Column(db.String(500), nullable=True)
+    language = db.Column(db.String(80), nullable=True)
+    estimated_reading_hours = db.Column(db.Float, nullable=True)
+    cover_image = db.Column(db.String(500), nullable=True)
 
     def get_absolute_path(self):
         """Returns the absolute file path of the book."""

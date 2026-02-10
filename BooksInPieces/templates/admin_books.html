@@ -16,6 +16,43 @@
                 </div>
 
                 <div class="mb-3">
+                    <label for="author" class="form-label">Autore</label>
+                    <input type="text" name="author" class="form-control" placeholder="es. Lev Tolstoj">
+                </div>
+
+                <div class="row g-3 mb-3">
+                    <div class="col-sm-6">
+                        <label for="publication_year" class="form-label">Anno</label>
+                        <input type="number" name="publication_year" class="form-control" min="0" max="2100" placeholder="es. 1877">
+                    </div>
+                    <div class="col-sm-6">
+                        <label for="language" class="form-label">Lingua</label>
+                        <input type="text" name="language" class="form-control" placeholder="es. Italiano">
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label for="genre" class="form-label">Genere</label>
+                    <input type="text" name="genre" class="form-control" placeholder="es. Classico, Saggio">
+                </div>
+
+                <div class="mb-3">
+                    <label for="tags" class="form-label">Tag</label>
+                    <input type="text" name="tags" class="form-control" placeholder="Separati da virgola: russi, classici, narrativa">
+                </div>
+
+                <div class="row g-3 mb-3">
+                    <div class="col-sm-6">
+                        <label for="estimated_reading_hours" class="form-label">Tempo lettura stimato (ore)</label>
+                        <input type="number" step="0.1" min="0" name="estimated_reading_hours" class="form-control" placeholder="es. 4.5">
+                    </div>
+                    <div class="col-sm-6">
+                        <label for="cover_image" class="form-label">Copertina (URL)</label>
+                        <input type="url" name="cover_image" class="form-control" placeholder="https://...">
+                    </div>
+                </div>
+
+                <div class="mb-3">
                     <label for="short_description" class="form-label">Descrizione breve</label>
                     <textarea name="short_description" rows="3" class="form-control"></textarea>
                 </div>
@@ -38,7 +75,7 @@
                     <thead class="table-light">
                         <tr>
                             <th>Titolo</th>
-                            <th>Descrizione</th>
+                            <th>Metadati</th>
                             <th class="text-end">Azioni</th>
                         </tr>
                     </thead>
@@ -46,7 +83,15 @@
                         {% for book in books %}
                         <tr>
                             <td><strong>{{ book.title }}</strong></td>
-                            <td>{{ book.short_description or "Nessuna descrizione" }}</td>
+                            <td>
+                                <div class="small text-muted">
+                                    {{ book.author or 'Autore n/d' }} · {{ book.publication_year or 'Anno n/d' }} · {{ book.genre or 'Genere n/d' }}
+                                </div>
+                                <div class="small text-muted">
+                                    {{ book.language or 'Lingua n/d' }} · {{ (book.estimated_reading_hours ~ 'h') if book.estimated_reading_hours else 'Tempo n/d' }}
+                                </div>
+                                <div class="small">{{ book.tags or "Nessun tag" }}</div>
+                            </td>
                             <td class="text-end">
                                 <form action="{{ url_for('app_routes.delete_book', book_id=book.id) }}" method="post" class="d-inline">
                                     <button type="submit" class="btn btn-outline-danger btn-sm"><i class="bi bi-trash"></i> Elimina</button>
