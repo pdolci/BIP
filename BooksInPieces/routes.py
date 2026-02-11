@@ -605,11 +605,19 @@ def delete_schedule(schedule_id):
 
 @app_routes.route("/manage_books")
 def manage_books():
+    if "user_id" not in session or not session.get("is_admin"):
+        flash("Accesso negato!")
+        return redirect(url_for("app_routes.index"))
+
     books = Book.query.all()
     return render_template("admin_books.html", books=books)
 
 @app_routes.route("/upload_book", methods=["POST"])
 def upload_book():
+    if "user_id" not in session or not session.get("is_admin"):
+        flash("Accesso negato!")
+        return redirect(url_for("app_routes.index"))
+
     if "book_file" not in request.files:
         flash("Nessun file selezionato!")
         return redirect(request.url)
@@ -667,6 +675,46 @@ def upload_book():
         db.session.commit()
         flash("Libro caricato con successo!")
 
+    return redirect(url_for("app_routes.manage_books"))
+
+
+@app_routes.route("/admin/book/edit/<int:book_id>", methods=["POST"])
+def edit_book(book_id):
+    if "user_id" not in session or not session.get("is_admin"):
+        flash("Accesso negato!")
+        return redirect(url_for("app_routes.index"))
+
+    book = Book.query.get(book_id)
+    if not book:
+        flash("Libro non trovato.")
+        return redirect(url_for("app_routes.manage_books"))
+
+    title = (request.form.get("title") or "").strip()
+    if not title:
+        flash("Il titolo è obbligatorio.")
+        return redirect(url_for("app_routes.manage_books"))
+
+    publication_year = (request.form.get("publication_year") or "").strip()
+    estimated_reading_hours = (request.form.get("estimated_reading_hours") or "").strip()
+
+    parsed_publication_year = int(publication_year) if publication_year.isdigit() else None
+    try:
+        parsed_estimated_hours = float(estimated_reading_hours) if estimated_reading_hours else None
+    except ValueError:
+        parsed_estimated_hours = None
+
+    book.title = title
+    book.short_description = (request.form.get("short_description") or "").strip() or None
+    book.author = (request.form.get("author") or "").strip() or None
+    book.publication_year = parsed_publication_year
+    book.genre = (request.form.get("genre") or "").strip() or None
+    book.tags = (request.form.get("tags") or "").strip() or None
+    book.language = (request.form.get("language") or "").strip() or None
+    book.estimated_reading_hours = parsed_estimated_hours
+    book.cover_image = (request.form.get("cover_image") or "").strip() or None
+
+    db.session.commit()
+    flash("Libro aggiornato con successo!")
     return redirect(url_for("app_routes.manage_books"))
 
 
