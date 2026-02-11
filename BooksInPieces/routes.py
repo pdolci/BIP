@@ -29,6 +29,7 @@ ALLOWED_EXTENSIONS = {"txt", "html", "htm"}
 app_routes = Blueprint("app_routes", __name__)
 
 WEEKDAY_CHOICES = {"0", "1", "2", "3", "4", "5", "6"}
+MAX_ACTIVE_SUBSCRIPTIONS = 3
 
 
 def _normalize_tags(tags_value):
@@ -311,8 +312,9 @@ def select_book():
         delivery_time = parse_time_str(request.form.get("delivery_time"))
         weekdays_selected = request.form.getlist("weekdays") or request.form.getlist("frequency_weekdays")
 
-        if any(not schedule.is_paused for schedule in active_schedules):
-            flash("Hai già una sottoscrizione attiva. Mettila in pausa o cancellala prima di aggiungerne un'altra.")
+        active_subscriptions = sum(1 for schedule in active_schedules if not schedule.is_paused)
+        if active_subscriptions >= MAX_ACTIVE_SUBSCRIPTIONS:
+            flash("Hai raggiunto il limite di 3 sottoscrizioni attive. Metti in pausa o cancella una sottoscrizione prima di aggiungerne un'altra.")
             return redirect(url_for("app_routes.select_book"))
 
         if frequency_type == FREQ_WEEKDAYS and not weekdays_selected:
