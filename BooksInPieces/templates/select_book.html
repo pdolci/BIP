@@ -96,6 +96,18 @@
                         {% endfor %}
                     </div>
                 </div>
+                <div class="mb-3">
+                    <label class="form-label">Canale di consegna</label>
+                    <select name="delivery_channel" id="delivery-channel" class="form-select">
+                        <option value="{{ delivery_email }}">Email</option>
+                        <option value="{{ delivery_telegram }}">Telegram</option>
+                    </select>
+                </div>
+                <div class="mb-3 d-none" id="telegram-handle-group">
+                    <label class="form-label">Handle Telegram</label>
+                    <input type="text" name="telegram_handle" class="form-control" placeholder="es. @mio_handle" value="{{ session_telegram_handle or '' }}">
+                    <small class="text-muted">Verrà salvato nel tuo profilo e usato per le prossime consegne Telegram.</small>
+                </div>
                 <div class="mb-4">
                     <label class="form-label">Orario consegna (es. 07:30 o "dopo cena")</label>
                     <input type="text" name="delivery_time" class="form-control" placeholder="07:30 oppure dopo cena">
@@ -174,6 +186,8 @@
                         <small class="text-muted">Frequenza: {{ describe_frequency(schedule) }}</small>
                         <br>
                         <small class="text-muted">Orario: {{ schedule.delivery_time.strftime('%H:%M') if schedule.delivery_time else '08:00 (default)' }}</small>
+                        <br>
+                        <small class="text-muted">Canale: {{ describe_delivery_channel(schedule) }}</small>
                         {% if schedule.travel_pause_until %}
                         <br>
                         <small class="text-warning">Modalità viaggio fino al {{ schedule.travel_pause_until.strftime('%d/%m/%Y %H:%M') }}</small>
@@ -220,6 +234,8 @@
     const frequencySelect = document.getElementById("frequency-type");
     const frequencyDaysGroup = document.getElementById("frequency-days-group");
     const weekdaysGroup = document.getElementById("weekdays-group");
+    const deliveryChannelSelect = document.getElementById("delivery-channel");
+    const telegramHandleGroup = document.getElementById("telegram-handle-group");
 
     const updateFrequencyFields = () => {
         const value = frequencySelect.value;
@@ -227,7 +243,14 @@
         weekdaysGroup.classList.toggle("d-none", value !== "weekdays");
     };
 
+    const updateDeliveryFields = () => {
+        const value = deliveryChannelSelect.value;
+        telegramHandleGroup.classList.toggle("d-none", value !== "{{ delivery_telegram }}");
+    };
+
     frequencySelect.addEventListener("change", updateFrequencyFields);
+    deliveryChannelSelect.addEventListener("change", updateDeliveryFields);
     updateFrequencyFields();
+    updateDeliveryFields();
 </script>
 {% endblock %}

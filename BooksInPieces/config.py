@@ -27,3 +27,5 @@ class Config:
     MAIL_PASSWORD = _get_required_env("MAIL_PASSWORD")
 
     APP_TIMEZONE = os.environ.get("APP_TIMEZONE", "Europe/Rome")
+
+    TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")

@@ -1,35 +1,26 @@
-import logging
 import html
+import json
+import logging
 import re
+import urllib.parse
+import urllib.request
 from dataclasses import dataclass
+
+import chardet
 from flask_mail import Message
-from extensions import mail, db
-from models import ReadingSchedule, Book, User, DeliveryEvent
+
 from config import Config
+from extensions import db, mail
+from models import Book, DeliveryEvent, ReadingSchedule, User
 from schedule_utils import compute_next_send_datetime
 from time_utils import utc_now_naive
-import chardet
 
 ANSI_ESCAPE_RE = re.compile(r"\x1B(?:\[[0-?]*[ -/]*[@-~]|[@-Z\\-_])")
 CONTROL_CHARS_RE = re.compile(r"[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]")
 
-def send_email(to, subject, body, html_body=None):
-    """ Invia una email e logga eventuali errori """
-    try:
-        msg = Message(subject, sender=Config.MAIL_USERNAME, recipients=[to])  # Updated sender
-        msg.body = body
-        if html_body:
-            msg.html = html_body
-
-        logging.info(f"\U0001F4E7 Tentativo di invio email a {to} con oggetto: {subject}")
-        mail.send(msg)
-        logging.info(f"✅ Email inviata correttamente a {to}")
-    except Exception as e:
-        logging.error(f"❌ Errore nell'invio email a {to}: {e}")
-
-
-def is_html_file(file_path):
-    return file_path.lower().endswith((".html", ".htm"))
+DELIVERY_EMAIL = "email"
+DELIVERY_TELEGRAM = "telegram"
+SUPPORTED_DELIVERY_CHANNELS = {DELIVERY_EMAIL, DELIVERY_TELEGRAM}
 
 
 @dataclass
@@ -38,8 +29,63 @@ class ContentChunk:
     html_content: str | None = None
 
 
+def send_email(to, subject, body, html_body=None):
+    try:
+        msg = Message(subject, sender=Config.MAIL_USERNAME, recipients=[to])
+        msg.body = body
+        if html_body:
+            msg.html = html_body
+        mail.send(msg)
+        logging.info(f"✅ Email inviata correttamente a {to}")
+        return True
+    except Exception as error:
+        logging.error(f"❌ Errore nell'invio email a {to}: {error}")
+        return False
+
+
+def send_telegram_message(handle, message):
+    token = Config.TELEGRAM_BOT_TOKEN
+    if not token:
+        logging.error("❌ TELEGRAM_BOT_TOKEN non configurato: impossibile inviare su Telegram.")
+        return False
+
+    chat_id = (handle or "").strip()
+    if not chat_id:
+        logging.error("❌ Handle Telegram non valido.")
+        return False
+
+    if chat_id.startswith("@"):
+        chat_id = chat_id[1:]
+
+    api_url = f"https://api.telegram.org/bot{token}/sendMessage"
+    payload = urllib.parse.urlencode({"chat_id": f"@{chat_id}", "text": message}).encode("utf-8")
+
+    try:
+        req = urllib.request.Request(api_url, data=payload, method="POST")
+        with urllib.request.urlopen(req, timeout=10) as response:
+            body = json.loads(response.read().decode("utf-8"))
+        if body.get("ok"):
+            logging.info(f"✅ Messaggio Telegram inviato a @{chat_id}")
+            return True
+        logging.error(f"❌ Telegram API error: {body}")
+    except Exception as error:
+        logging.error(f"❌ Errore invio Telegram a @{chat_id}: {error}")
+
+    return False
+
+
+def is_html_file(file_path):
+    return file_path.lower().endswith((".html", ".htm"))
+
+
+def sanitize_source_text(content):
+    normalized = content.replace("\r\n", "\n").replace("\r", "\n")
+    normalized = ANSI_ESCAPE_RE.sub("", normalized)
+    normalized = CONTROL_CHARS_RE.sub("", normalized)
+    return normalized
+
+
 def html_to_text(content):
-    """Converte un contenuto HTML in testo leggibile."""
     content = sanitize_source_text(content)
     content = re.sub(r"<script.*?>.*?</script>", "", content, flags=re.IGNORECASE | re.DOTALL)
     content = re.sub(r"<style.*?>.*?</style>", "", content, flags=re.IGNORECASE | re.DOTALL)
@@ -49,16 +95,7 @@ def html_to_text(content):
     return re.sub(r"\n\s*\n+", "\n\n", content).strip()
 
 
-def sanitize_source_text(content):
-    """Rimuove sequenze ANSI e caratteri di controllo preservando il layout testuale."""
-    normalized = content.replace("\r\n", "\n").replace("\r", "\n")
-    normalized = ANSI_ESCAPE_RE.sub("", normalized)
-    normalized = CONTROL_CHARS_RE.sub("", normalized)
-    return normalized
-
-
 def build_email_bodies(chunk, is_html_source=False):
-    """Genera corpo testo e corpo HTML per l'email."""
     plain_text = chunk.plain_text.strip() if isinstance(chunk, ContentChunk) else str(chunk).strip()
 
     if is_html_source:
@@ -95,7 +132,6 @@ def _is_self_closing_tag(tag_token):
 
 
 def extract_html_chunk(content, start_idx, length):
-    """Estrae un frammento HTML mantenendo la struttura del markup originale."""
     tokens = re.findall(r"<[^>]+>|[^<]+", content)
     sentence_end = re.compile(r"[.!?][\"')\]]?$")
     current_word_index = 0
@@ -174,21 +210,17 @@ def extract_html_chunk(content, start_idx, length):
 
 
 def detect_encoding(file_path):
-    """ Rileva la codifica del file per evitare errori di lettura. """
-    with open(file_path, "rb") as f:
-        raw_data = f.read(10000)  # Legge un pezzo di file per determinare l'encoding
+    with open(file_path, "rb") as source:
+        raw_data = source.read(10000)
         result = chardet.detect(raw_data)
         return result["encoding"] or "utf-8"
 
 
-
-
 def count_total_words(file_path):
-    """Conta il totale parole del contenuto sorgente per metriche progresso/capitolo."""
     try:
         encoding = detect_encoding(file_path)
-        with open(file_path, 'r', encoding=encoding, errors='replace') as file:
-            content = sanitize_source_text(file.read())
+        with open(file_path, "r", encoding=encoding, errors="replace") as source:
+            content = sanitize_source_text(source.read())
             if is_html_file(file_path):
                 content = html_to_text(content)
             return len(re.findall(r"\S+", content))
@@ -202,112 +234,135 @@ def build_email_subject(book_title, part_number, completion_percent):
 
 
 def read_file_chunk(file_path, start_idx, length):
-    """Reads a chunk of the book file starting from `start_idx`, ensuring correct word count while preserving original formatting and ending at a full sentence."""
     try:
-        encoding = detect_encoding(file_path)  # ✅ Detect file encoding
-        with open(file_path, 'r', encoding=encoding, errors='replace') as file:
-            logging.info(f"📖 File aperto con successo: {file_path}, partendo da {start_idx}")
-
-            source_content = sanitize_source_text(file.read())
+        encoding = detect_encoding(file_path)
+        with open(file_path, "r", encoding=encoding, errors="replace") as source:
+            source_content = sanitize_source_text(source.read())
             source_is_html = is_html_file(file_path)
             if source_is_html:
                 chunk, new_index = extract_html_chunk(source_content, start_idx, length)
                 if chunk is None:
-                    logging.info("⚠️ Nessun altro testo da inviare, fine della lettura.")
                     return None, start_idx, source_is_html
-
-                logging.info(f"📖 Chunk HTML letto ({len(chunk.plain_text.split())} parole): {chunk.plain_text[:100]}...")
                 return chunk, new_index, source_is_html
 
-            readable_content = source_content
-            words = list(re.finditer(r"\S+", readable_content))
-            
-            if start_idx >= len(words):  # Check if start index exceeds word count
-                logging.info("⚠️ Nessun altro testo da inviare, fine della lettura.")
+            words = list(re.finditer(r"\S+", source_content))
+            if start_idx >= len(words):
                 return None, start_idx, source_is_html
 
-            # Extract the required number of words
             end_word_index = min(start_idx + length, len(words))
-
-            # Ensure the chunk ends at the end of a sentence
             sentence_end = re.compile(r"[.!?][\"')\]]?$")
             while end_word_index < len(words) and not sentence_end.search(words[end_word_index - 1].group(0)):
                 end_word_index += 1
 
             chunk_start_char = words[start_idx].start()
             chunk_end_char = words[end_word_index - 1].end()
-            chunk_text = readable_content[chunk_start_char:chunk_end_char].strip()
-            new_index = end_word_index
-            
-            logging.info(f"📖 Chunk letto ({new_index - start_idx} parole): {chunk_text[:100]}...")  # Anteprima primo pezzo
-            
-            return ContentChunk(plain_text=chunk_text), new_index, source_is_html
-    except Exception as e:
-        logging.error(f"❌ Errore nella lettura del file {file_path}: {e}")
+            chunk_text = source_content[chunk_start_char:chunk_end_char].strip()
+            return ContentChunk(plain_text=chunk_text), end_word_index, source_is_html
+    except Exception as error:
+        logging.error(f"❌ Errore nella lettura del file {file_path}: {error}")
         return None, start_idx, False
 
-def send_next_book_part(schedule_id):
-    """ Invia la prossima sezione del libro via email """
-    schedule = ReadingSchedule.query.get(schedule_id)
 
+def _build_delivery_content(chunk, source_is_html, book_title, part_number, completion_percent):
+    text_body, html_body = build_email_bodies(chunk, is_html_source=source_is_html)
+    progress_header = f"Parte {part_number} – ~{completion_percent}%"
+    text_payload = f"{book_title}\n{progress_header}\n\n{text_body}"
+    html_payload = (
+        "<div style='font-family: Arial, sans-serif; color: #334155; margin-bottom: 16px; font-weight: 600;'>"
+        f"{html.escape(progress_header)}"
+        "</div>" + html_body
+    )
+    return text_payload, html_payload
+
+
+def _deliver_chunk(user, schedule, book, text_payload, html_payload, part_number, completion_percent):
+    channel = schedule.delivery_channel if schedule.delivery_channel in SUPPORTED_DELIVERY_CHANNELS else DELIVERY_EMAIL
+
+    if channel == DELIVERY_TELEGRAM:
+        if not user.telegram_handle:
+            logging.warning(f"⚠️ Utente {user.id} senza handle Telegram: fallback email.")
+        else:
+            if send_telegram_message(user.telegram_handle, text_payload):
+                return True, DELIVERY_TELEGRAM
+            logging.warning(f"⚠️ Invio Telegram fallito per user={user.id}: fallback email.")
+
+    email_sent = send_email(
+        user.email,
+        build_email_subject(book.title, part_number, completion_percent),
+        text_payload,
+        html_body=html_payload,
+    )
+    return email_sent, DELIVERY_EMAIL
+
+
+def send_next_book_part(schedule_id):
+    schedule = ReadingSchedule.query.get(schedule_id)
     if not schedule:
         logging.error(f"⚠️ Nessun programma di lettura trovato con ID {schedule_id}")
         return
 
     book = Book.query.get(schedule.book_id)
     user = User.query.get(schedule.user_id)
-
     if not book or not user:
         logging.error("⚠️ Errore: Nessun libro o utente trovato")
         return
 
-    file_path = book.get_absolute_path()  # Use method to get path
+    file_path = book.get_absolute_path()
     chunk, new_index, source_is_html = read_file_chunk(
         file_path,
         schedule.last_sent_index,
         schedule.words_per_minute * schedule.minutes_per_reading,
     )
-
     if not chunk:
         logging.info("⚠️ Nessun altro testo da inviare, fine della lettura.")
         return
 
     words_sent = max(new_index - schedule.last_sent_index, 0)
     total_words = count_total_words(file_path)
-    part_number = max(1, (schedule.last_sent_index // max(schedule.words_per_minute * schedule.minutes_per_reading, 1)) + 1)
+    words_per_part = max(schedule.words_per_minute * schedule.minutes_per_reading, 1)
+    part_number = max(1, (schedule.last_sent_index // words_per_part) + 1)
     completion_percent = int(round((new_index / total_words) * 100)) if total_words else 0
-
-    text_body, html_body = build_email_bodies(chunk, is_html_source=source_is_html)
-    progress_header = f"Parte {part_number} – ~{completion_percent}%"
-    text_body = f"{progress_header}\n\n{text_body}"
-    html_body = (
-        "<div style='font-family: Arial, sans-serif; color: #334155; margin-bottom: 16px; font-weight: 600;'>"
-        f"{html.escape(progress_header)}"
-        "</div>" + html_body
+    text_payload, html_payload = _build_delivery_content(
+        chunk,
+        source_is_html,
+        book.title,
+        part_number,
+        completion_percent,
     )
 
-    send_email(user.email, build_email_subject(book.title, part_number, completion_percent), text_body, html_body=html_body)
-
-    # Instead of sending an email, print the chunk
-    #logging.info(f"📖 Chunk for {user.email} - {book.title}:")
-    #print("\n" + "="*50 + f"\n📖 {book.title} - Next Reading for {user.email}\n" + "="*50)
-    #print(chunk)  # Print the chunk instead of sending the email
-    #print("="*50 + "\n")
+    delivered, effective_channel = _deliver_chunk(
+        user,
+        schedule,
+        book,
+        text_payload,
+        html_payload,
+        part_number,
+        completion_percent,
+    )
+    if not delivered:
+        return
 
     try:
         schedule.last_sent_index = new_index
         schedule.next_send_date = compute_next_send_datetime(utc_now_naive(), schedule, allow_immediate=False)
-        db.session.commit()  # Removed unnecessary add()
-        logging.info(f"✅ Database aggiornato per l'utente {user.email}")
-    except Exception as e:
+        db.session.add(
+            DeliveryEvent(
+                schedule_id=schedule.id,
+                event_type="sent",
+                words_count=words_sent,
+                start_word_index=max(schedule.last_sent_index - words_sent, 0),
+                end_word_index=new_index,
+                note=f"Consegna via {effective_channel}",
+            )
+        )
+        db.session.commit()
+        logging.info(f"✅ Delivery completata per schedule={schedule.id} via {effective_channel}")
+    except Exception as error:
         db.session.rollback()
-        logging.error(f"❌ Errore nel commit del database: {e}")
-
-
+        logging.error(f"❌ Errore nel commit del database: {error}")
 
 
 def send_password_reset_email(user_email, reset_url):
-    """Invia l'email con link per il recupero password."""
     subject = "Recupero password - BooksInPieces"
     body = (
         "Hai richiesto il recupero della password.\n\n"
