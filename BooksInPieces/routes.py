@@ -694,6 +694,7 @@ def delete_schedule(schedule_id):
     schedule = ReadingSchedule.query.get(schedule_id)
 
     if schedule and schedule.user_id == session["user_id"]:
+        DeliveryEvent.query.filter_by(schedule_id=schedule.id).delete(synchronize_session=False)
         db.session.delete(schedule)
         db.session.commit()
         flash("Sottoscrizione eliminata con successo!")
