@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-7">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body p-4 p-md-5">
+                <h1 class="h4 mb-4"><i class="bi bi-person-lines-fill me-2"></i>Il tuo profilo</h1>
+                <form method="POST" class="row g-3">
+                    <div class="col-12">
+                        <label class="form-label" for="email">Email</label>
+                        <input class="form-control" id="email" name="email" type="email" value="{{ user.email }}" required>
+                    </div>
+
+                    <div class="col-12">
+                        <label class="form-label" for="telegram_handle">Handle Telegram</label>
+                        <input class="form-control" id="telegram_handle" name="telegram_handle" type="text" value="{{ user.telegram_handle or '' }}" placeholder="@tuohandle">
+                        <div class="form-text">Opzionale, utile per ricevere i pezzi via Telegram.</div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label" for="new_password">Nuova password</label>
+                        <input class="form-control" id="new_password" name="new_password" type="password" minlength="6" placeholder="Lascia vuoto per non cambiare">
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label" for="confirm_password">Conferma nuova password</label>
+                        <input class="form-control" id="confirm_password" name="confirm_password" type="password" minlength="6" placeholder="Ripeti la nuova password">
+                    </div>
+
+                    <div class="col-12 d-grid d-sm-flex justify-content-sm-end mt-2">
+                        <button class="btn btn-primary px-4" type="submit">
+                            <i class="bi bi-check2-circle me-1"></i>Salva modifiche
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

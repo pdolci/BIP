@@ -305,6 +305,47 @@ def logout():
     flash("Logout effettuato!")
     return redirect(url_for("app_routes.index"))
 
+
+@app_routes.route("/profile", methods=["GET", "POST"])
+def profile():
+    if "user_id" not in session:
+        flash("Devi effettuare il login per modificare il profilo.")
+        return redirect(url_for("app_routes.login"))
+
+    user = User.query.get(session["user_id"])
+    if not user:
+        flash("Utente non trovato.")
+        return redirect(url_for("app_routes.logout"))
+
+    if request.method == "POST":
+        email = (request.form.get("email") or "").strip().lower()
+        telegram_handle = (request.form.get("telegram_handle") or "").strip()
+        new_password = request.form.get("new_password") or ""
+        confirm_password = request.form.get("confirm_password") or ""
+
+        if not email:
+            flash("L'email è obbligatoria.")
+            return redirect(url_for("app_routes.profile"))
+
+        existing_user = User.query.filter(User.email == email, User.id != user.id).first()
+        if existing_user:
+            flash("Questa email è già in uso da un altro account.")
+            return redirect(url_for("app_routes.profile"))
+
+        if new_password or confirm_password:
+            if new_password != confirm_password:
+                flash("Le nuove password non coincidono.")
+                return redirect(url_for("app_routes.profile"))
+            user.set_password(new_password)
+
+        user.email = email
+        user.telegram_handle = telegram_handle or None
+        db.session.commit()
+        flash("Profilo aggiornato con successo!")
+        return redirect(url_for("app_routes.profile"))
+
+    return render_template("profile.html", user=user)
+
 @app_routes.route("/select_book", methods=["GET", "POST"])
 def select_book():
     if "user_id" not in session:
