@@ -499,6 +499,25 @@ def select_book():
     )
 
 
+@app_routes.route("/reading_center")
+def reading_center():
+    if "user_id" not in session:
+        flash("Devi effettuare il login per accedere al centro di controllo lettura.")
+        return redirect(url_for("app_routes.login"))
+
+    user_id = session["user_id"]
+    active_schedules = ReadingSchedule.query.filter_by(user_id=user_id).all()
+    dashboard = _build_dashboard(active_schedules)
+
+    return render_template(
+        "reading_center.html",
+        active_schedules=active_schedules,
+        dashboard=dashboard,
+        describe_frequency=describe_frequency,
+        describe_delivery_channel=describe_delivery_channel,
+    )
+
+
 @app_routes.route("/snooze_schedule/<int:schedule_id>", methods=["POST"])
 def snooze_schedule(schedule_id):
     if "user_id" not in session:
