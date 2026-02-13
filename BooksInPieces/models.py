@@ -68,4 +68,4 @@ class DeliveryEvent(db.Model):
     note = db.Column(db.String(255), nullable=True)
     created_at = db.Column(db.DateTime, default=db.func.current_timestamp(), nullable=False)
 
-    schedule = db.relationship("ReadingSchedule", backref="delivery_events", lazy=True)
+    schedule = db.relationship("ReadingSchedule", backref=db.backref("delivery_events", lazy=True, cascade="all, delete-orphan"), lazy=True)

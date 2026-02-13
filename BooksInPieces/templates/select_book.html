@@ -42,15 +42,74 @@
         </div>
     </div>
 
+    <div class="col-lg-10">
+        <div class="card panel-card p-4 dashboard-card">
+            <h3 class="mb-3"><i class="bi bi-speedometer2 me-2"></i>Centro di controllo lettura</h3>
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <div class="metric-box">
+                        <small>Sottoscrizioni</small>
+                        <h4>{{ active_schedules|length }}</h4>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="metric-box">
+                        <small>Completamento medio</small>
+                        <h4>{{ dashboard.completion if dashboard else 0 }}%</h4>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="metric-box">
+                        <small>Parole rimanenti</small>
+                        <h4>{{ dashboard.remaining_words if dashboard else 0 }}</h4>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="metric-box">
+                        <small>Streak</small>
+                        <h4>{{ dashboard.streak_days if dashboard else 0 }} giorni</h4>
+                    </div>
+                </div>
+            </div>
+            {% if dashboard and dashboard.history %}
+            <hr>
+            <h6 class="mb-2">Ultimi eventi</h6>
+            <ul class="list-group list-group-flush">
+                {% for item in dashboard.history[:5] %}
+                <li class="list-group-item d-flex justify-content-between align-items-start">
+                    <div>
+                        <strong>{{ item.book_title }}</strong>
+                        <div class="text-muted small">{{ item.created_at.strftime('%d/%m/%Y %H:%M') }}</div>
+                    </div>
+                    <span class="small">
+                        {% if item.event_type == 'sent' %}✅ Inviata{% elif item.event_type == 'skipped' %}⚠️ Saltata{% elif item.event_type == 'paused' %}⏸️ Pausa{% elif item.event_type == 'resumed' %}▶️ Ripresa{% else %}{{ item.event_type }}{% endif %}
+                    </span>
+                </li>
+                {% endfor %}
+            </ul>
+            {% endif %}
+        </div>
+    </div>
+
     <div class="col-lg-7">
         <div class="card panel-card p-4">
             <h2 class="mb-4"><i class="bi bi-sliders me-2"></i>Configura la tua lettura</h2>
             <form method="POST">
                 <div class="mb-3">
                     <label class="form-label">Scegli un libro ({{ books|length }} risultati)</label>
-                    <select name="book_id" class="form-select" required>
+                    <select id="book-select" name="book_id" class="form-select" required>
                         {% for book in books %}
-                            <option value="{{ book.id }}">
+                            <option
+                                value="{{ book.id }}"
+                                data-title="{{ book.title }}"
+                                data-author="{{ book.author or 'Autore n/d' }}"
+                                data-year="{{ book.publication_year or 'Anno n/d' }}"
+                                data-genre="{{ book.genre or 'Genere n/d' }}"
+                                data-language="{{ book.language or 'Lingua n/d' }}"
+                                data-tags="{{ book.tags or '' }}"
+                                data-description="{{ book.short_description or '' }}"
+                                data-hours="{{ book.estimated_reading_hours or '' }}"
+                            >
                                 {{ book.title }}{% if book.author %} — {{ book.author }}{% endif %}{% if book.estimated_reading_hours %} · {{ book.estimated_reading_hours }}h{% endif %}
                             </option>
                         {% endfor %}
@@ -58,11 +117,22 @@
                 </div>
 
                 {% if books %}
-                <div class="mb-3 small text-muted">
-                    {% set preview = books[0] %}
-                    <strong>Preview:</strong>
-                    {{ preview.author or 'Autore n/d' }} · {{ preview.publication_year or 'Anno n/d' }} · {{ preview.genre or 'Genere n/d' }} · {{ preview.language or 'Lingua n/d' }}
-                    {% if preview.tags %}<br>Tag: {{ preview.tags }}{% endif %}
+                <div class="mb-3 p-3 border rounded bg-light" id="book-preview">
+                    <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+                        <div>
+                            <strong id="preview-title">{{ books[0].title }}</strong>
+                            <div class="text-muted small" id="preview-meta">
+                                {{ books[0].author or 'Autore n/d' }} · {{ books[0].publication_year or 'Anno n/d' }} · {{ books[0].genre or 'Genere n/d' }} · {{ books[0].language or 'Lingua n/d' }}
+                            </div>
+                        </div>
+                        <span class="badge text-bg-primary" id="preview-hours">
+                            {% if books[0].estimated_reading_hours %}{{ books[0].estimated_reading_hours }} ore{% else %}Durata n/d{% endif %}
+                        </span>
+                    </div>
+                    <div class="small mt-2" id="preview-description">{{ books[0].short_description or 'Nessuna descrizione disponibile.' }}</div>
+                    <div class="small text-muted mt-2" id="preview-tags">
+                        {% if books[0].tags %}Tag: {{ books[0].tags }}{% else %}Tag: n/d{% endif %}
+                    </div>
                 </div>
                 {% else %}
                 <div class="alert alert-warning">Nessun libro trovato con i filtri selezionati.</div>
@@ -117,118 +187,63 @@
         </div>
     </div>
 
-    {% if active_schedules %}
-
-    {% if dashboard %}
     <div class="col-lg-10">
-        <div class="card panel-card p-4 dashboard-card">
-            <h3 class="mb-3"><i class="bi bi-speedometer2 me-2"></i>Dashboard Lettura</h3>
-            <div class="row g-3 mb-3">
-                <div class="col-md-4">
-                    <div class="metric-box">
-                        <small>Completamento</small>
-                        <h4>{{ dashboard.completion }}%</h4>
-                    </div>
-                </div>
-                <div class="col-md-4">
-                    <div class="metric-box">
-                        <small>Rimanenti stimati</small>
-                        <h4>{{ dashboard.remaining_words }} parole</h4>
-                        <small>~{{ dashboard.remaining_minutes }} min</small>
-                    </div>
-                </div>
-                <div class="col-md-4">
-                    <div class="metric-box">
-                        <small>Streak</small>
-                        <h4>{{ dashboard.streak_days }} giorni consecutivi</h4>
-                    </div>
-                </div>
-            </div>
-            <h5 class="mb-2">Storico consegne + cosa mi sono perso</h5>
-            <ul class="list-group list-group-flush">
-                {% for item in dashboard.history %}
-                <li class="list-group-item d-flex justify-content-between align-items-start">
-                    <div>
-                        <strong>{{ item.book_title }}</strong>
-                        <div class="text-muted small">{{ item.created_at.strftime('%d/%m/%Y %H:%M') }}</div>
-                        <div>
-                            {% if item.event_type == 'sent' %}
-                                ✅ Consegna inviata ({{ item.words_count }} parole)
-                            {% elif item.event_type == 'skipped' %}
-                                ⚠️ Persa/saltata: {{ item.note }}
-                            {% elif item.event_type == 'paused' %}
-                                ⏸️ {{ item.note }}
-                            {% elif item.event_type == 'resumed' %}
-                                ▶️ {{ item.note }}
-                            {% else %}
-                                {{ item.note or item.event_type }}
-                            {% endif %}
-                        </div>
-                    </div>
-                </li>
-                {% else %}
-                <li class="list-group-item text-muted">Nessun evento disponibile.</li>
-                {% endfor %}
-            </ul>
-        </div>
-    </div>
-    {% endif %}
-
-    <div class="col-lg-8">
         <div class="card panel-card p-4">
             <h3 class="mb-3"><i class="bi bi-calendar3 me-2"></i>Sottoscrizioni Attive</h3>
-            <ul class="list-group list-group-flush">
+            {% if active_schedules %}
+            <div class="row g-3">
                 {% for schedule in active_schedules %}
-                <li class="list-group-item py-3 d-flex flex-wrap justify-content-between align-items-center gap-3">
-                    <div>
-                        <strong>{{ schedule.book.title }}</strong>
-                        <br>
-                        <small class="text-muted">Frequenza: {{ describe_frequency(schedule) }}</small>
-                        <br>
-                        <small class="text-muted">Orario: {{ schedule.delivery_time.strftime('%H:%M') if schedule.delivery_time else '08:00 (default)' }}</small>
-                        <br>
-                        <small class="text-muted">Canale: {{ describe_delivery_channel(schedule) }}</small>
-                        {% if schedule.travel_pause_until %}
-                        <br>
-                        <small class="text-warning">Modalità viaggio fino al {{ schedule.travel_pause_until.strftime('%d/%m/%Y %H:%M') }}</small>
+                <div class="col-lg-6">
+                    <div class="border rounded p-3 h-100 bg-white">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <h6 class="mb-1">{{ schedule.book.title }}</h6>
+                                <div class="small text-muted">{{ describe_frequency(schedule) }}</div>
+                            </div>
+                            <span class="badge {% if schedule.is_paused %}text-bg-warning{% else %}text-bg-success{% endif %}">
+                                {% if schedule.is_paused %}In pausa{% else %}Attiva{% endif %}
+                            </span>
+                        </div>
+                        <div class="small text-muted mt-2">Orario: {{ schedule.delivery_time.strftime('%H:%M') if schedule.delivery_time else '08:00 (default)' }}</div>
+                        <div class="small text-muted">Canale: {{ describe_delivery_channel(schedule) }}</div>
+                        {% if schedule.next_send_date %}
+                        <div class="small text-muted">Prossimo invio: {{ schedule.next_send_date.strftime('%d/%m/%Y %H:%M') }}</div>
                         {% endif %}
+                        {% if schedule.travel_pause_until %}
+                        <div class="small text-warning">Modalità viaggio fino al {{ schedule.travel_pause_until.strftime('%d/%m/%Y %H:%M') }}</div>
+                        {% endif %}
+
+                        <div class="d-flex flex-wrap gap-2 mt-3">
+                            <form action="{{ url_for('app_routes.pause_schedule', schedule_id=schedule.id) }}" method="post" class="d-inline">
+                                <button type="submit" class="btn btn-warning btn-sm">
+                                    {% if schedule.is_paused %}<i class="bi bi-play-fill"></i> Riprendi{% else %}<i class="bi bi-pause-fill"></i> Pausa{% endif %}
+                                </button>
+                            </form>
+                            <form action="{{ url_for('app_routes.snooze_schedule', schedule_id=schedule.id) }}" method="post" class="d-inline">
+                                <input type="hidden" name="action" value="skip_next">
+                                <button type="submit" class="btn btn-outline-secondary btn-sm">Salta prossima</button>
+                            </form>
+                            <form action="{{ url_for('app_routes.snooze_schedule', schedule_id=schedule.id) }}" method="post" class="d-inline">
+                                <input type="hidden" name="action" value="delay_24h">
+                                <button type="submit" class="btn btn-outline-secondary btn-sm">Rimanda 24h</button>
+                            </form>
+                            <form action="{{ url_for('app_routes.travel_mode_schedule', schedule_id=schedule.id) }}" method="post" class="d-flex gap-2 align-items-center">
+                                <input type="number" name="travel_days" class="form-control form-control-sm" min="1" value="7" style="max-width: 90px;">
+                                <button type="submit" class="btn btn-outline-warning btn-sm">Viaggio</button>
+                            </form>
+                            <form action="{{ url_for('app_routes.delete_schedule', schedule_id=schedule.id) }}" method="post" class="d-inline">
+                                <button type="submit" class="btn btn-danger btn-sm"><i class="bi bi-trash"></i> Cancella</button>
+                            </form>
+                        </div>
                     </div>
-                    <div class="d-flex gap-2">
-                        <form action="{{ url_for('app_routes.pause_schedule', schedule_id=schedule.id) }}" method="post" class="d-inline">
-                            <button type="submit" class="btn btn-warning btn-sm">
-                                {% if schedule.is_paused %}<i class="bi bi-play-fill"></i> Riprendi{% else %}<i class="bi bi-pause-fill"></i> Pausa{% endif %}
-                            </button>
-                        </form>
-                        <form action="{{ url_for('app_routes.snooze_schedule', schedule_id=schedule.id) }}" method="post" class="d-inline">
-                            <input type="hidden" name="action" value="skip_next">
-                            <button type="submit" class="btn btn-outline-secondary btn-sm">Salta prossima</button>
-                        </form>
-                        <form action="{{ url_for('app_routes.snooze_schedule', schedule_id=schedule.id) }}" method="post" class="d-inline">
-                            <input type="hidden" name="action" value="delay_24h">
-                            <button type="submit" class="btn btn-outline-secondary btn-sm">Rimanda 24h</button>
-                        </form>
-                        <form action="{{ url_for('app_routes.delete_schedule', schedule_id=schedule.id) }}" method="post" class="d-inline">
-                            <button type="submit" class="btn btn-danger btn-sm"><i class="bi bi-trash"></i> Cancella</button>
-                        </form>
-                    </div>
-                    <div class="w-100 d-flex flex-wrap gap-2 mt-2">
-                        <form action="{{ url_for('app_routes.snooze_next_schedule', schedule_id=schedule.id) }}" method="post" class="d-inline">
-                            <button type="submit" class="btn btn-outline-primary btn-sm">Salta prossima consegna</button>
-                        </form>
-                        <form action="{{ url_for('app_routes.snooze_24h_schedule', schedule_id=schedule.id) }}" method="post" class="d-inline">
-                            <button type="submit" class="btn btn-outline-primary btn-sm">Rimanda di 24h</button>
-                        </form>
-                        <form action="{{ url_for('app_routes.travel_mode_schedule', schedule_id=schedule.id) }}" method="post" class="d-flex gap-2 align-items-center">
-                            <input type="number" name="travel_days" class="form-control form-control-sm" min="1" value="7" style="max-width: 90px;">
-                            <button type="submit" class="btn btn-outline-warning btn-sm">Modalità viaggio</button>
-                        </form>
-                    </div>
-                </li>
+                </div>
                 {% endfor %}
-            </ul>
+            </div>
+            {% else %}
+            <div class="alert alert-info mb-0">Non hai ancora sottoscrizioni attive. Configura la prima lettura qui sopra.</div>
+            {% endif %}
         </div>
     </div>
-    {% endif %}
 </div>
 <script>
     const frequencySelect = document.getElementById("frequency-type");
@@ -236,6 +251,7 @@
     const weekdaysGroup = document.getElementById("weekdays-group");
     const deliveryChannelSelect = document.getElementById("delivery-channel");
     const telegramHandleGroup = document.getElementById("telegram-handle-group");
+    const bookSelect = document.getElementById("book-select");
 
     const updateFrequencyFields = () => {
         const value = frequencySelect.value;
@@ -248,8 +264,35 @@
         telegramHandleGroup.classList.toggle("d-none", value !== "{{ delivery_telegram }}");
     };
 
+    const updatePreview = () => {
+        if (!bookSelect || !bookSelect.selectedOptions.length) {
+            return;
+        }
+        const selected = bookSelect.selectedOptions[0];
+        const title = selected.dataset.title || "Titolo n/d";
+        const author = selected.dataset.author || "Autore n/d";
+        const year = selected.dataset.year || "Anno n/d";
+        const genre = selected.dataset.genre || "Genere n/d";
+        const language = selected.dataset.language || "Lingua n/d";
+        const description = selected.dataset.description || "Nessuna descrizione disponibile.";
+        const tags = selected.dataset.tags || "n/d";
+        const hours = selected.dataset.hours ? `${selected.dataset.hours} ore` : "Durata n/d";
+
+        document.getElementById("preview-title").textContent = title;
+        document.getElementById("preview-meta").textContent = `${author} · ${year} · ${genre} · ${language}`;
+        document.getElementById("preview-description").textContent = description;
+        document.getElementById("preview-tags").textContent = `Tag: ${tags}`;
+        document.getElementById("preview-hours").textContent = hours;
+    };
+
     frequencySelect.addEventListener("change", updateFrequencyFields);
     deliveryChannelSelect.addEventListener("change", updateDeliveryFields);
+
+    if (bookSelect) {
+        bookSelect.addEventListener("change", updatePreview);
+        updatePreview();
+    }
+
     updateFrequencyFields();
     updateDeliveryFields();
 </script>
