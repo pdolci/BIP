@@ -24,8 +24,22 @@
                         <a class="nav-link" href="{{ url_for('app_routes.index') }}"><i class="bi bi-house-door me-1"></i>Home</a>
                     </li>
                     {% if 'user_id' in session %}
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('app_routes.select_book') }}"><i class="bi bi-journal-text me-1"></i>I Miei Libri</a>
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                <i class="bi bi-journal-text me-1"></i>Lettura
+                            </a>
+                            <ul class="dropdown-menu dropdown-menu-end">
+                                <li>
+                                    <a class="dropdown-item" href="{{ url_for('app_routes.select_book') }}">
+                                        <i class="bi bi-sliders me-2"></i>I Miei Libri
+                                    </a>
+                                </li>
+                                <li>
+                                    <a class="dropdown-item" href="{{ url_for('app_routes.reading_center') }}">
+                                        <i class="bi bi-speedometer2 me-2"></i>Centro di controllo
+                                    </a>
+                                </li>
+                            </ul>
                         </li>
                         {% if session.get('is_admin') %}
                             <li class="nav-item">
