@@ -1,6 +1,39 @@
 import os
 
 
+def _load_dotenv_if_present() -> None:
+    """Load environment variables from a local .env file if present."""
+    base_dir = os.path.abspath(os.path.dirname(__file__))
+    candidate_paths = [
+        os.path.join(base_dir, ".env"),
+        os.path.join(os.path.dirname(base_dir), ".env"),
+    ]
+
+    for env_path in candidate_paths:
+        if not os.path.isfile(env_path):
+            continue
+
+        with open(env_path, "r", encoding="utf-8") as env_file:
+            for raw_line in env_file:
+                line = raw_line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+
+                if line.startswith("export "):
+                    line = line[len("export "):].strip()
+
+                key, value = line.split("=", 1)
+                key = key.strip()
+                value = value.strip().strip('"').strip("'")
+
+                if key:
+                    os.environ.setdefault(key, value)
+        break
+
+
+_load_dotenv_if_present()
+
+
 def _get_required_env(var_name: str) -> str:
     value = os.environ.get(var_name)
     if not value:
