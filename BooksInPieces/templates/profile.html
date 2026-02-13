@@ -18,6 +18,16 @@
                         <div class="form-text">Opzionale, utile per ricevere i pezzi via Telegram.</div>
                     </div>
 
+
+                    <div class="col-12">
+                        <label class="form-label" for="preferred_delivery_channel">Canale predefinito di consegna</label>
+                        <select class="form-select" id="preferred_delivery_channel" name="preferred_delivery_channel">
+                            <option value="{{ delivery_email }}" {% if user.preferred_delivery_channel == delivery_email %}selected{% endif %}>Email</option>
+                            <option value="{{ delivery_telegram }}" {% if user.preferred_delivery_channel == delivery_telegram %}selected{% endif %}>Telegram</option>
+                        </select>
+                        <div class="form-text">Applicheremo questo canale anche alle sottoscrizioni già attive.</div>
+                    </div>
+
                     <div class="col-md-6">
                         <label class="form-label" for="new_password">Nuova password</label>
                         <input class="form-control" id="new_password" name="new_password" type="password" minlength="6" placeholder="Lascia vuoto per non cambiare">

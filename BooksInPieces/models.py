@@ -10,6 +10,7 @@ class User(db.Model):
     is_admin = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=db.func.current_timestamp())
     telegram_handle = db.Column(db.String(120), nullable=True)
+    preferred_delivery_channel = db.Column(db.String(20), nullable=False, default="email")
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
