@@ -320,6 +320,7 @@ def profile():
     if request.method == "POST":
         email = (request.form.get("email") or "").strip().lower()
         telegram_handle = (request.form.get("telegram_handle") or "").strip()
+        preferred_delivery_channel = (request.form.get("preferred_delivery_channel") or DELIVERY_EMAIL).strip().lower()
         new_password = request.form.get("new_password") or ""
         confirm_password = request.form.get("confirm_password") or ""
 
@@ -332,6 +333,14 @@ def profile():
             flash("Questa email è già in uso da un altro account.")
             return redirect(url_for("app_routes.profile"))
 
+        if preferred_delivery_channel not in SUPPORTED_DELIVERY_CHANNELS:
+            flash("Canale di consegna preferito non valido.")
+            return redirect(url_for("app_routes.profile"))
+
+        if preferred_delivery_channel == DELIVERY_TELEGRAM and not telegram_handle:
+            flash("Per usare Telegram come canale predefinito devi inserire il tuo handle.")
+            return redirect(url_for("app_routes.profile"))
+
         if new_password or confirm_password:
             if new_password != confirm_password:
                 flash("Le nuove password non coincidono.")
@@ -340,11 +349,22 @@ def profile():
 
         user.email = email
         user.telegram_handle = telegram_handle or None
+        user.preferred_delivery_channel = preferred_delivery_channel
+
+        schedules = ReadingSchedule.query.filter_by(user_id=user.id).all()
+        for schedule in schedules:
+            schedule.delivery_channel = preferred_delivery_channel
+
         db.session.commit()
         flash("Profilo aggiornato con successo!")
         return redirect(url_for("app_routes.profile"))
 
-    return render_template("profile.html", user=user)
+    return render_template(
+        "profile.html",
+        user=user,
+        delivery_email=DELIVERY_EMAIL,
+        delivery_telegram=DELIVERY_TELEGRAM,
+    )
 
 @app_routes.route("/select_book", methods=["GET", "POST"])
 def select_book():
@@ -365,9 +385,10 @@ def select_book():
         frequency_days = int(request.form.get("frequency_days", 1) or 1)
         delivery_time = parse_time_str(request.form.get("delivery_time"))
         weekdays_selected = request.form.getlist("weekdays") or request.form.getlist("frequency_weekdays")
-        delivery_channel = (request.form.get("delivery_channel") or DELIVERY_EMAIL).strip().lower()
-        telegram_handle = (request.form.get("telegram_handle") or "").strip()
         current_user = User.query.get(user_id)
+        default_channel = (current_user.preferred_delivery_channel if current_user else DELIVERY_EMAIL)
+        delivery_channel = (request.form.get("delivery_channel") or default_channel).strip().lower()
+        telegram_handle = (request.form.get("telegram_handle") or "").strip()
 
         if delivery_channel not in SUPPORTED_DELIVERY_CHANNELS:
             flash("Canale di consegna non valido.")
@@ -474,6 +495,7 @@ def select_book():
         delivery_email=DELIVERY_EMAIL,
         delivery_telegram=DELIVERY_TELEGRAM,
         session_telegram_handle=(user.telegram_handle if user else ""),
+        default_delivery_channel=(user.preferred_delivery_channel if user else DELIVERY_EMAIL),
     )
 
 

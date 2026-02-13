@@ -99,8 +99,8 @@
                 <div class="mb-3">
                     <label class="form-label">Canale di consegna</label>
                     <select name="delivery_channel" id="delivery-channel" class="form-select">
-                        <option value="{{ delivery_email }}">Email</option>
-                        <option value="{{ delivery_telegram }}">Telegram</option>
+                        <option value="{{ delivery_email }}" {% if default_delivery_channel == delivery_email %}selected{% endif %}>Email</option>
+                        <option value="{{ delivery_telegram }}" {% if default_delivery_channel == delivery_telegram %}selected{% endif %}>Telegram</option>
                     </select>
                 </div>
                 <div class="mb-3 d-none" id="telegram-handle-group">
