@@ -9,6 +9,7 @@ class User(db.Model):
     password_hash = db.Column(db.String(255), nullable=False)
     is_admin = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=db.func.current_timestamp())
+    telegram_handle = db.Column(db.String(120), nullable=True)
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -52,6 +53,7 @@ class ReadingSchedule(db.Model):
     skip_next = db.Column(db.Boolean, default=False)
     snooze_until = db.Column(db.DateTime, nullable=True)
     travel_pause_until = db.Column(db.DateTime, nullable=True)
+    delivery_channel = db.Column(db.String(20), nullable=False, default="email")
     book = db.relationship("Book", backref="schedules", lazy=True)
 
 

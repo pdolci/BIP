@@ -7,7 +7,13 @@ from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 from werkzeug.utils import secure_filename
 from extensions import db
 from models import User, Book, ReadingSchedule, DeliveryEvent
-from email_sender import send_next_book_part, send_password_reset_email
+from email_sender import (
+    DELIVERY_EMAIL,
+    DELIVERY_TELEGRAM,
+    SUPPORTED_DELIVERY_CHANNELS,
+    send_next_book_part,
+    send_password_reset_email,
+)
 from config import Config
 from schedule_utils import (
     parse_time_str,
@@ -90,6 +96,12 @@ def _build_book_filters(search_query, author, year, genre, tags, language, max_h
             filters.append(Book.estimated_reading_hours <= threshold)
 
     return filters
+
+
+def describe_delivery_channel(schedule):
+    if schedule.delivery_channel == DELIVERY_TELEGRAM:
+        return "Telegram"
+    return "Email"
 
 
 def describe_frequency(schedule):
@@ -213,9 +225,10 @@ def register():
     if request.method == "POST":
         email = request.form["email"]
         password = request.form["password"]
+        telegram_handle = (request.form.get("telegram_handle") or "").strip()
         user = User.query.filter_by(email=email).first()
         if not user:
-            user = User(email=email)
+            user = User(email=email, telegram_handle=telegram_handle or None)
             user.set_password(password)
             db.session.add(user)
             db.session.commit()
@@ -311,6 +324,21 @@ def select_book():
         frequency_days = int(request.form.get("frequency_days", 1) or 1)
         delivery_time = parse_time_str(request.form.get("delivery_time"))
         weekdays_selected = request.form.getlist("weekdays") or request.form.getlist("frequency_weekdays")
+        delivery_channel = (request.form.get("delivery_channel") or DELIVERY_EMAIL).strip().lower()
+        telegram_handle = (request.form.get("telegram_handle") or "").strip()
+        current_user = User.query.get(user_id)
+
+        if delivery_channel not in SUPPORTED_DELIVERY_CHANNELS:
+            flash("Canale di consegna non valido.")
+            return redirect(url_for("app_routes.select_book"))
+
+        resolved_telegram_handle = telegram_handle or (current_user.telegram_handle if current_user else "")
+        if delivery_channel == DELIVERY_TELEGRAM and not resolved_telegram_handle:
+            flash("Inserisci il tuo handle Telegram per ricevere i pezzi su Telegram.")
+            return redirect(url_for("app_routes.select_book"))
+
+        if telegram_handle and current_user:
+            current_user.telegram_handle = telegram_handle
 
         active_subscriptions = sum(1 for schedule in active_schedules if not schedule.is_paused)
         if active_subscriptions >= MAX_ACTIVE_SUBSCRIPTIONS:
@@ -354,7 +382,8 @@ def select_book():
             weekdays=weekdays,
             delivery_time=delivery_time,
             next_send_date=local_naive_to_utc_naive(next_send_date),
-            is_paused=False
+            is_paused=False,
+            delivery_channel=delivery_channel,
         )
         db.session.add(schedule)
         db.session.commit()
@@ -384,12 +413,15 @@ def select_book():
     books = books_query.order_by(Book.title.asc()).all()
 
     dashboard = _build_dashboard(active_schedules)
+    user = User.query.get(user_id)
+
     return render_template(
         "select_book.html",
         books=books,
         active_schedules=active_schedules,
         dashboard=dashboard,
         describe_frequency=describe_frequency,
+        describe_delivery_channel=describe_delivery_channel,
         search_query=search_query,
         filter_author=filter_author,
         filter_year=filter_year,
@@ -398,6 +430,9 @@ def select_book():
         filter_language=filter_language,
         filter_max_hours=filter_max_hours,
         normalize_tags=_normalize_tags,
+        delivery_email=DELIVERY_EMAIL,
+        delivery_telegram=DELIVERY_TELEGRAM,
+        session_telegram_handle=(user.telegram_handle if user else ""),
     )
 
 
