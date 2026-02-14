@@ -19,6 +19,10 @@ class User(db.Model):
         return check_password_hash(self.password_hash, password)
 
 class Book(db.Model):
+    __table_args__ = (
+        db.Index("ix_book_is_active_title", "is_active", "title"),
+    )
+
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(255), nullable=False)
     file_path = db.Column(db.String(500), nullable=False)
@@ -31,12 +35,18 @@ class Book(db.Model):
     language = db.Column(db.String(80), nullable=True)
     estimated_reading_hours = db.Column(db.Float, nullable=True)
     cover_image = db.Column(db.String(500), nullable=True)
+    word_count = db.Column(db.Integer, nullable=False, default=0)
 
     def get_absolute_path(self):
         """Returns the absolute file path of the book."""
         return os.path.join(Config.UPLOAD_FOLDER, self.file_path)
 
 class ReadingSchedule(db.Model):
+    __table_args__ = (
+        db.Index("ix_reading_schedule_user_active", "user_id", "is_paused"),
+        db.Index("ix_reading_schedule_due", "next_send_date", "is_paused", "travel_pause_until"),
+    )
+
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
     book_id = db.Column(db.Integer, db.ForeignKey("book.id"), nullable=False)
@@ -56,9 +66,14 @@ class ReadingSchedule(db.Model):
     travel_pause_until = db.Column(db.DateTime, nullable=True)
     delivery_channel = db.Column(db.String(20), nullable=False, default="email")
     book = db.relationship("Book", backref="schedules", lazy=True)
+    user = db.relationship("User", backref="schedules", lazy=True)
 
 
 class DeliveryEvent(db.Model):
+    __table_args__ = (
+        db.Index("ix_delivery_event_schedule_created", "schedule_id", "created_at"),
+    )
+
     id = db.Column(db.Integer, primary_key=True)
     schedule_id = db.Column(db.Integer, db.ForeignKey("reading_schedule.id"), nullable=False)
     event_type = db.Column(db.String(20), nullable=False, default="sent")
