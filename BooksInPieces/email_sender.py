@@ -45,19 +45,16 @@ def send_email(to, subject, body, html_body=None):
         return False
 
 
-def send_telegram_message(handle, message):
+def send_telegram_message(chat_id, message):
     token = Config.TELEGRAM_BOT_TOKEN
     if not token:
         logging.error("❌ TELEGRAM_BOT_TOKEN non configurato: impossibile inviare su Telegram.")
         return False
 
-    chat_id = (handle or "").strip()
+    chat_id = (chat_id or "").strip()
     if not chat_id:
-        logging.error("❌ Handle Telegram non valido.")
+        logging.error("❌ chat_id Telegram non valido.")
         return False
-
-    if chat_id.startswith("@"):
-        chat_id = chat_id[1:]
 
     api_url = f"https://api.telegram.org/bot{token}/sendMessage"
 
@@ -96,14 +93,14 @@ def send_telegram_message(handle, message):
 
     try:
         for index, message_chunk in enumerate(messages, start=1):
-            payload = urllib.parse.urlencode({"chat_id": f"@{chat_id}", "text": message_chunk}).encode("utf-8")
+            payload = urllib.parse.urlencode({"chat_id": chat_id, "text": message_chunk}).encode("utf-8")
             req = urllib.request.Request(api_url, data=payload, method="POST")
             with urllib.request.urlopen(req, timeout=10) as response:
                 body = json.loads(response.read().decode("utf-8"))
             if not body.get("ok"):
                 logging.error(f"❌ Telegram API error (chunk {index}/{len(messages)}): {body}")
                 return False
-        logging.info(f"✅ Messaggio Telegram inviato a @{chat_id} in {len(messages)} parte/i")
+        logging.info(f"✅ Messaggio Telegram inviato a chat_id {chat_id} in {len(messages)} parte/i")
         return True
     except urllib.error.HTTPError as error:
         response_body = ""
@@ -112,16 +109,16 @@ def send_telegram_message(handle, message):
         except Exception:
             response_body = "<impossibile leggere il body della risposta Telegram>"
         logging.error(
-            "❌ Telegram HTTP error per @%s: status=%s reason=%s response=%s",
+            "❌ Telegram HTTP error per chat_id %s: status=%s reason=%s response=%s",
             chat_id,
             error.code,
             error.reason,
             response_body,
         )
     except urllib.error.URLError as error:
-        logging.error("❌ Telegram URL error per @%s: reason=%s", chat_id, error.reason)
+        logging.error("❌ Telegram URL error per chat_id %s: reason=%s", chat_id, error.reason)
     except Exception as error:
-        logging.exception(f"❌ Errore invio Telegram a @{chat_id}: {error}")
+        logging.exception(f"❌ Errore invio Telegram a chat_id {chat_id}: {error}")
 
     return False
 
