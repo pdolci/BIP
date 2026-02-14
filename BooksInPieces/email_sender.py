@@ -21,6 +21,7 @@ CONTROL_CHARS_RE = re.compile(r"[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]")
 DELIVERY_EMAIL = "email"
 DELIVERY_TELEGRAM = "telegram"
 SUPPORTED_DELIVERY_CHANNELS = {DELIVERY_EMAIL, DELIVERY_TELEGRAM}
+TELEGRAM_MAX_MESSAGE_LENGTH = 4000
 
 
 @dataclass
@@ -58,16 +59,51 @@ def send_telegram_message(handle, message):
         chat_id = chat_id[1:]
 
     api_url = f"https://api.telegram.org/bot{token}/sendMessage"
-    payload = urllib.parse.urlencode({"chat_id": f"@{chat_id}", "text": message}).encode("utf-8")
+
+    def split_message(message_text, max_length):
+        normalized = (message_text or "").strip()
+        if not normalized:
+            return []
+
+        chunks = []
+        text_to_process = normalized
+        while text_to_process:
+            if len(text_to_process) <= max_length:
+                chunks.append(text_to_process)
+                break
+
+            split_index = text_to_process.rfind("\n", 0, max_length + 1)
+            if split_index <= 0:
+                split_index = text_to_process.rfind(" ", 0, max_length + 1)
+            if split_index <= 0:
+                split_index = max_length
+
+            chunk = text_to_process[:split_index].strip()
+            if not chunk:
+                chunk = text_to_process[:max_length]
+                split_index = max_length
+
+            chunks.append(chunk)
+            text_to_process = text_to_process[split_index:].lstrip()
+
+        return chunks
+
+    messages = split_message(message, TELEGRAM_MAX_MESSAGE_LENGTH)
+    if not messages:
+        logging.error("❌ Messaggio Telegram vuoto: invio annullato.")
+        return False
 
     try:
-        req = urllib.request.Request(api_url, data=payload, method="POST")
-        with urllib.request.urlopen(req, timeout=10) as response:
-            body = json.loads(response.read().decode("utf-8"))
-        if body.get("ok"):
-            logging.info(f"✅ Messaggio Telegram inviato a @{chat_id}")
-            return True
-        logging.error(f"❌ Telegram API error: {body}")
+        for index, message_chunk in enumerate(messages, start=1):
+            payload = urllib.parse.urlencode({"chat_id": f"@{chat_id}", "text": message_chunk}).encode("utf-8")
+            req = urllib.request.Request(api_url, data=payload, method="POST")
+            with urllib.request.urlopen(req, timeout=10) as response:
+                body = json.loads(response.read().decode("utf-8"))
+            if not body.get("ok"):
+                logging.error(f"❌ Telegram API error (chunk {index}/{len(messages)}): {body}")
+                return False
+        logging.info(f"✅ Messaggio Telegram inviato a @{chat_id} in {len(messages)} parte/i")
+        return True
     except Exception as error:
         logging.error(f"❌ Errore invio Telegram a @{chat_id}: {error}")
 
