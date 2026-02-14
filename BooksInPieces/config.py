@@ -44,6 +44,23 @@ def _get_required_env(var_name: str) -> str:
     return value
 
 
+def _get_bool_env(var_name: str, default: bool) -> bool:
+    value = os.environ.get(var_name)
+    if value is None:
+        return default
+    return value.lower() in {"1", "true", "yes", "on"}
+
+
+def _get_int_env(var_name: str, default: int) -> int:
+    value = os.environ.get(var_name)
+    if value is None:
+        return default
+    try:
+        return int(value)
+    except ValueError:
+        return default
+
+
 class Config:
     SECRET_KEY = _get_required_env("SECRET_KEY")
 
@@ -62,3 +79,16 @@ class Config:
     APP_TIMEZONE = os.environ.get("APP_TIMEZONE", "Europe/Rome")
 
     TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
+
+    DEBUG = _get_bool_env("FLASK_DEBUG", False)
+    SESSION_COOKIE_SECURE = _get_bool_env("SESSION_COOKIE_SECURE", True)
+    SESSION_COOKIE_HTTPONLY = _get_bool_env("SESSION_COOKIE_HTTPONLY", True)
+    SESSION_COOKIE_SAMESITE = os.environ.get("SESSION_COOKIE_SAMESITE", "Lax")
+    PREFERRED_URL_SCHEME = os.environ.get("PREFERRED_URL_SCHEME", "https")
+
+    USE_PROXY_FIX = _get_bool_env("USE_PROXY_FIX", True)
+    PROXY_FIX_X_FOR = _get_int_env("PROXY_FIX_X_FOR", 1)
+    PROXY_FIX_X_PROTO = _get_int_env("PROXY_FIX_X_PROTO", 1)
+    PROXY_FIX_X_HOST = _get_int_env("PROXY_FIX_X_HOST", 0)
+    PROXY_FIX_X_PORT = _get_int_env("PROXY_FIX_X_PORT", 0)
+    PROXY_FIX_X_PREFIX = _get_int_env("PROXY_FIX_X_PREFIX", 0)
