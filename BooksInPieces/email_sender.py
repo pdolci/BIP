@@ -313,6 +313,8 @@ def read_file_chunk(file_path, start_idx, length):
 
 
 def _build_delivery_content(chunk, source_is_html, book_title, part_number, completion_percent):
+    # Costruisce un payload unico da riutilizzare su canali diversi
+    # (Telegram testo puro, Email testo + HTML).
     text_body, html_body = build_email_bodies(chunk, is_html_source=source_is_html)
     progress_header = f"Parte {part_number} – ~{completion_percent}%"
     text_payload = f"{book_title}\n{progress_header}\n\n{text_body}"
@@ -324,27 +326,68 @@ def _build_delivery_content(chunk, source_is_html, book_title, part_number, comp
     return text_payload, html_payload
 
 
-def _deliver_chunk(user, schedule, book, text_payload, html_payload, part_number, completion_percent):
-    channel = schedule.delivery_channel if schedule.delivery_channel in SUPPORTED_DELIVERY_CHANNELS else DELIVERY_EMAIL
+def _resolve_delivery_channel(schedule):
+    """Restituisce il canale richiesto, applicando un fallback sicuro a email."""
+    if schedule.delivery_channel in SUPPORTED_DELIVERY_CHANNELS:
+        return schedule.delivery_channel
+    return DELIVERY_EMAIL
 
-    if channel == DELIVERY_TELEGRAM:
-        if not user.telegram_handle:
-            logging.warning(f"⚠️ Utente {user.id} senza handle Telegram: fallback email.")
-        else:
-            if send_telegram_message(user.telegram_handle, text_payload):
-                return True, DELIVERY_TELEGRAM
-            logging.warning(f"⚠️ Invio Telegram fallito per user={user.id}: fallback email.")
 
-    email_sent = send_email(
+def _send_chunk_via_telegram(user, text_payload):
+    """
+    Invia il contenuto su Telegram.
+
+    Il metodo non gestisce fallback: restituisce solo l'esito tecnico del canale Telegram,
+    lasciando al chiamante la decisione su eventuali alternative.
+    """
+    if not user.telegram_handle:
+        logging.warning(f"⚠️ Utente {user.id} senza handle Telegram: impossibile inviare via Telegram.")
+        return False
+
+    sent = send_telegram_message(user.telegram_handle, text_payload)
+    if not sent:
+        logging.warning(f"⚠️ Invio Telegram fallito per user={user.id}.")
+    return sent
+
+
+def _send_chunk_via_email(user, book, text_payload, html_payload, part_number, completion_percent):
+    """Invia il contenuto via email mantenendo oggetto e corpo coerenti con la progressione."""
+    return send_email(
         user.email,
         build_email_subject(book.title, part_number, completion_percent),
         text_payload,
         html_body=html_payload,
     )
+
+
+def _deliver_chunk(user, schedule, book, text_payload, html_payload, part_number, completion_percent):
+    """
+    Orchestra la consegna del chunk separando chiaramente la logica per canale.
+
+    Strategia:
+    1) prova il canale configurato dall'utente;
+    2) se Telegram fallisce, effettua fallback automatico su email.
+    """
+    channel = _resolve_delivery_channel(schedule)
+
+    if channel == DELIVERY_TELEGRAM:
+        if _send_chunk_via_telegram(user, text_payload):
+            return True, DELIVERY_TELEGRAM
+        logging.warning(f"⚠️ Attivo fallback email per user={user.id}.")
+
+    email_sent = _send_chunk_via_email(
+        user,
+        book,
+        text_payload,
+        html_payload,
+        part_number,
+        completion_percent,
+    )
     return email_sent, DELIVERY_EMAIL
 
 
 def send_next_book_part(schedule_id):
+    # 1) Recupero entità principali della consegna.
     schedule = ReadingSchedule.query.get(schedule_id)
     if not schedule:
         logging.error(f"⚠️ Nessun programma di lettura trovato con ID {schedule_id}")
@@ -357,6 +400,7 @@ def send_next_book_part(schedule_id):
         return
 
     file_path = book.get_absolute_path()
+    # 2) Estrae il prossimo blocco rispettando il ritmo di lettura configurato.
     chunk, new_index, source_is_html = read_file_chunk(
         file_path,
         schedule.last_sent_index,
@@ -379,6 +423,7 @@ def send_next_book_part(schedule_id):
         completion_percent,
     )
 
+    # 3) Invio su canale preferito con fallback email se necessario.
     delivered, effective_channel = _deliver_chunk(
         user,
         schedule,
@@ -392,6 +437,7 @@ def send_next_book_part(schedule_id):
         return
 
     try:
+        # 4) Persistenza stato avanzamento + audit della consegna.
         schedule.last_sent_index = new_index
         schedule.next_send_date = compute_next_send_datetime(utc_now_naive(), schedule, allow_immediate=False)
         db.session.add(
