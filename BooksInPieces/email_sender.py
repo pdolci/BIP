@@ -3,6 +3,7 @@ import json
 import logging
 import re
 import urllib.parse
+import urllib.error
 import urllib.request
 from dataclasses import dataclass
 
@@ -104,8 +105,23 @@ def send_telegram_message(handle, message):
                 return False
         logging.info(f"✅ Messaggio Telegram inviato a @{chat_id} in {len(messages)} parte/i")
         return True
+    except urllib.error.HTTPError as error:
+        response_body = ""
+        try:
+            response_body = error.read().decode("utf-8", errors="replace")
+        except Exception:
+            response_body = "<impossibile leggere il body della risposta Telegram>"
+        logging.error(
+            "❌ Telegram HTTP error per @%s: status=%s reason=%s response=%s",
+            chat_id,
+            error.code,
+            error.reason,
+            response_body,
+        )
+    except urllib.error.URLError as error:
+        logging.error("❌ Telegram URL error per @%s: reason=%s", chat_id, error.reason)
     except Exception as error:
-        logging.error(f"❌ Errore invio Telegram a @{chat_id}: {error}")
+        logging.exception(f"❌ Errore invio Telegram a @{chat_id}: {error}")
 
     return False
 
