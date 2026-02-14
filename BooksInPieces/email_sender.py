@@ -9,10 +9,11 @@ from dataclasses import dataclass
 
 import chardet
 from flask_mail import Message
+from sqlalchemy.orm import joinedload
 
 from config import Config
 from extensions import db, mail
-from models import Book, DeliveryEvent, ReadingSchedule, User
+from models import DeliveryEvent, ReadingSchedule
 from schedule_utils import compute_next_send_datetime
 from time_utils import utc_now_naive
 
@@ -388,13 +389,16 @@ def _deliver_chunk(user, schedule, book, text_payload, html_payload, part_number
 
 def send_next_book_part(schedule_id):
     # 1) Recupero entità principali della consegna.
-    schedule = ReadingSchedule.query.get(schedule_id)
+    schedule = ReadingSchedule.query.options(
+        joinedload(ReadingSchedule.book),
+        joinedload(ReadingSchedule.user),
+    ).filter_by(id=schedule_id).first()
     if not schedule:
         logging.error(f"⚠️ Nessun programma di lettura trovato con ID {schedule_id}")
         return
 
-    book = Book.query.get(schedule.book_id)
-    user = User.query.get(schedule.user_id)
+    book = schedule.book
+    user = schedule.user
     if not book or not user:
         logging.error("⚠️ Errore: Nessun libro o utente trovato")
         return
@@ -411,7 +415,9 @@ def send_next_book_part(schedule_id):
         return
 
     words_sent = max(new_index - schedule.last_sent_index, 0)
-    total_words = count_total_words(file_path)
+    total_words = book.word_count or count_total_words(file_path)
+    if total_words != (book.word_count or 0):
+        book.word_count = total_words
     words_per_part = max(schedule.words_per_minute * schedule.minutes_per_reading, 1)
     part_number = max(1, (schedule.last_sent_index // words_per_part) + 1)
     completion_percent = int(round((new_index / total_words) * 100)) if total_words else 0

@@ -2,6 +2,7 @@ import os
 import datetime
 import re
 from sqlalchemy import or_, and_
+from sqlalchemy.orm import joinedload
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash, send_from_directory
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 from werkzeug.utils import secure_filename
@@ -13,6 +14,7 @@ from email_sender import (
     SUPPORTED_DELIVERY_CHANNELS,
     send_next_book_part,
     send_password_reset_email,
+    count_total_words,
 )
 from config import Config
 from schedule_utils import (
@@ -130,9 +132,14 @@ def describe_frequency(schedule):
 
 def _count_book_words(schedule):
     """Conta le parole del libro per mostrare metriche di progresso."""
+    if schedule.book and schedule.book.word_count:
+        return schedule.book.word_count
+
     try:
         with open(schedule.book.get_absolute_path(), "r", encoding="utf-8", errors="replace") as source:
-            return len(re.findall(r"\S+", source.read()))
+            words_count = len(re.findall(r"\S+", source.read()))
+            schedule.book.word_count = words_count
+            return words_count
     except Exception as error:
         logging.warning(f"⚠️ Impossibile calcolare le parole per schedule {schedule.id}: {error}")
         return 0
@@ -164,6 +171,19 @@ def _build_dashboard(active_schedules):
     sent_events = []
     history = []
 
+    schedule_ids = [schedule.id for schedule in active_schedules]
+    events = []
+    if schedule_ids:
+        events = DeliveryEvent.query.filter(DeliveryEvent.schedule_id.in_(schedule_ids)).order_by(
+            DeliveryEvent.created_at.desc()
+        ).all()
+
+    events_by_schedule = {}
+    for event in events:
+        bucket = events_by_schedule.setdefault(event.schedule_id, [])
+        if len(bucket) < 12:
+            bucket.append(event)
+
     for schedule in active_schedules:
         schedule_total_words = _count_book_words(schedule)
         schedule_read_words = min(schedule.last_sent_index, schedule_total_words) if schedule_total_words else schedule.last_sent_index
@@ -176,7 +196,7 @@ def _build_dashboard(active_schedules):
         remaining_sessions = remaining_words / words_per_session
         total_remaining_minutes += int(round(remaining_sessions * schedule.minutes_per_reading))
 
-        schedule_events = DeliveryEvent.query.filter_by(schedule_id=schedule.id).order_by(DeliveryEvent.created_at.desc()).limit(12).all()
+        schedule_events = events_by_schedule.get(schedule.id, [])
         sent_events.extend([event for event in schedule_events if event.event_type == "sent"])
 
         for event in schedule_events:
@@ -217,7 +237,7 @@ def ensure_uploads_folder():
 
 @app_routes.route("/")
 def index():
-    books = Book.query.filter_by(is_active=True).all()
+    books = Book.query.filter_by(is_active=True).order_by(Book.title.asc()).all()
     return render_template("index.html", books=books)
 
 @app_routes.route("/register", methods=["GET", "POST"])
@@ -373,7 +393,7 @@ def select_book():
         return redirect(url_for("app_routes.login"))
 
     user_id = session["user_id"]
-    active_schedules = ReadingSchedule.query.filter_by(user_id=user_id).all()
+    active_schedules = ReadingSchedule.query.options(joinedload(ReadingSchedule.book)).filter_by(user_id=user_id).all()
 
     if request.method == "POST":
         book_id = request.form["book_id"]
@@ -506,7 +526,7 @@ def reading_center():
         return redirect(url_for("app_routes.login"))
 
     user_id = session["user_id"]
-    active_schedules = ReadingSchedule.query.filter_by(user_id=user_id).all()
+    active_schedules = ReadingSchedule.query.options(joinedload(ReadingSchedule.book)).filter_by(user_id=user_id).all()
     dashboard = _build_dashboard(active_schedules)
 
     return render_template(
@@ -729,7 +749,7 @@ def manage_books():
         flash("Accesso negato!")
         return redirect(url_for("app_routes.index"))
 
-    books = Book.query.all()
+    books = Book.query.order_by(Book.title.asc()).all()
     return render_template("admin_books.html", books=books)
 
 @app_routes.route("/upload_book", methods=["POST"])
@@ -778,6 +798,8 @@ def upload_book():
         except ValueError:
             parsed_estimated_hours = None
 
+        calculated_word_count = count_total_words(file_path)
+
         new_book = Book(
             title=title,
             file_path=filename,
@@ -790,6 +812,7 @@ def upload_book():
             language=language,
             estimated_reading_hours=parsed_estimated_hours,
             cover_image=cover_image,
+            word_count=calculated_word_count,
         )
         db.session.add(new_book)
         db.session.commit()
@@ -832,6 +855,10 @@ def edit_book(book_id):
     book.language = (request.form.get("language") or "").strip() or None
     book.estimated_reading_hours = parsed_estimated_hours
     book.cover_image = (request.form.get("cover_image") or "").strip() or None
+
+    file_path = book.get_absolute_path()
+    if os.path.exists(file_path):
+        book.word_count = count_total_words(file_path)
 
     db.session.commit()
     flash("Libro aggiornato con successo!")
