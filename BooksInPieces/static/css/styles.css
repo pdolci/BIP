@@ -1,111 +1,269 @@
 :root {
-    --brand-primary: #1f3c88;
-    --brand-accent: #2b6cb0;
-    --bg-soft: #f4f7fb;
-    --text-main: #1f2937;
+    --brand-primary: #146eb4;
+    --brand-primary-dark: #0f5a93;
+    --brand-accent: #ff9900;
+    --bg-page: #f3f4f6;
+    --bg-surface: #ffffff;
+    --border-soft: #dfe3ea;
+    --text-main: #111827;
+    --text-muted: #5b6472;
 }
 
 body {
-    background: linear-gradient(135deg, #eef4ff 0%, #f8fbff 45%, #edf6ff 100%);
+    background: var(--bg-page);
     color: var(--text-main);
     font-family: "Inter", "Segoe UI", Roboto, Arial, sans-serif;
     min-height: 100vh;
+    overflow-x: hidden;
 }
 
 .app-navbar {
-    background: rgba(31, 60, 136, 0.95);
-    backdrop-filter: blur(4px);
+    background: var(--brand-primary);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.18);
 }
 
 .navbar-brand {
-    font-weight: 700;
-    letter-spacing: 0.3px;
+    font-weight: 800;
+    letter-spacing: 0.2px;
 }
 
 .nav-link {
-    color: rgba(255, 255, 255, 0.9) !important;
-    font-weight: 500;
+    color: rgba(255, 255, 255, 0.95) !important;
+    font-weight: 600;
 }
 
-.nav-link:hover {
+.nav-link:hover,
+.nav-link:focus {
     color: #ffffff !important;
 }
 
+.navbar .dropdown-menu {
+    border: 1px solid var(--border-soft);
+    border-radius: 10px;
+}
+
+.page-shell {
+    max-width: 1240px;
+}
+
+.flash-message {
+    border-left: 4px solid var(--brand-primary);
+    border-radius: 10px;
+    background: #eff6ff;
+}
+
 .hero-panel {
-    border-radius: 20px;
-    background-image: linear-gradient(rgba(16, 35, 79, 0.68), rgba(16, 35, 79, 0.68)),
-        url("https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?auto=format&fit=crop&w=1600&q=80");
-    background-size: cover;
-    background-position: center;
-    color: #fff;
-    padding: 4rem 2rem;
+    border-radius: 16px;
+    border: 1px solid var(--border-soft);
+    background: linear-gradient(120deg, #fff 0%, #f8fbff 100%);
+    color: var(--text-main);
+    padding: 2.8rem;
 }
 
 .hero-panel .badge {
-    background: rgba(255, 255, 255, 0.15);
-    border: 1px solid rgba(255, 255, 255, 0.25);
+    background: #e6f2ff;
+    color: var(--brand-primary-dark);
+    border: 1px solid #b5d5f3;
+    font-weight: 600;
+}
+
+.hero-panel h1 {
+    font-weight: 800;
+}
+
+.hero-panel .lead {
+    color: var(--text-muted);
+}
+
+.quick-actions {
+    background: #fff7e8;
+    border: 1px solid #ffe2b5;
+    border-radius: 12px;
+}
+
+.hero-panel-desktop {
+    min-height: 250px;
+}
+
+.hero-panel-mobile {
+    padding: 1rem;
+    border-radius: 12px;
+}
+
+.hero-panel-mobile h1 {
+    font-weight: 800;
+    color: #0f172a;
+}
+
+.hero-panel-mobile p {
+    color: var(--text-muted);
+    font-size: 0.95rem;
+}
+
+.mobile-benefits .stat-card {
+    border-radius: 12px;
 }
 
 .stat-card,
 .book-card,
 .auth-card,
-.panel-card {
-    border: none;
-    border-radius: 16px;
-    box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+.panel-card,
+.dashboard-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-soft);
+    border-radius: 14px;
+    box-shadow: 0 2px 8px rgba(17, 24, 39, 0.04);
 }
 
-.stat-card {
-    background: #fff;
+.stat-card i {
+    color: var(--brand-primary);
+}
+
+.book-card {
+    overflow: hidden;
+    transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.book-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 24px rgba(17, 24, 39, 0.1);
 }
 
 .book-card img {
-    height: 220px;
+    height: 230px;
     object-fit: cover;
+    border-bottom: 1px solid var(--border-soft);
 }
 
 .book-card .card-title {
     font-weight: 700;
 }
 
-.btn-primary {
-    background: var(--brand-accent);
-    border-color: var(--brand-accent);
+.section-title {
+    font-weight: 800;
+    color: #0f172a;
 }
 
-.btn-primary:hover {
+.btn-primary {
     background: var(--brand-primary);
     border-color: var(--brand-primary);
+    font-weight: 600;
+}
+
+.btn-primary:hover,
+.btn-primary:focus {
+    background: var(--brand-primary-dark);
+    border-color: var(--brand-primary-dark);
+}
+
+.btn-warning {
+    font-weight: 700;
 }
 
 .form-control,
 .form-select {
     border-radius: 10px;
-    border: 1px solid #dbe4f0;
+    border: 1px solid #cad5e2;
 }
 
 .form-control:focus,
 .form-select:focus {
-    border-color: #7aa9e6;
-    box-shadow: 0 0 0 0.2rem rgba(66, 153, 225, 0.2);
+    border-color: #6aa9dd;
+    box-shadow: 0 0 0 0.2rem rgba(20, 110, 180, 0.15);
 }
 
 .auth-wrapper {
     min-height: 78vh;
 }
 
-.section-title {
-    font-weight: 700;
-}
-
 .dashboard-card .metric-box {
-    background: #f8fbff;
-    border: 1px solid #d9e6f7;
+    background: #f8fafc;
+    border: 1px solid var(--border-soft);
     border-radius: 12px;
     padding: 1rem;
 }
 
 .dashboard-card .metric-box h4 {
     margin: 0.3rem 0;
-    font-weight: 700;
+    font-weight: 800;
+}
+
+@media (max-width: 991.98px) {
+    .navbar-collapse {
+        margin-top: 0.75rem;
+        background: rgba(10, 55, 90, 0.95);
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        border-radius: 12px;
+        padding: 0.75rem;
+    }
+
+    .navbar-nav .nav-item {
+        width: 100%;
+    }
+
+    .navbar-nav .dropdown-menu {
+        border-radius: 8px;
+        margin-top: 0.35rem;
+    }
+
+    .nav-login-btn {
+        display: block;
+        width: 100%;
+        margin-top: 0.35rem;
+    }
+}
+
+@media (max-width: 767.98px) {
+    main.page-shell {
+        padding-top: 1rem !important;
+        padding-bottom: 1rem !important;
+    }
+
+    .hero-panel {
+        padding: 1.35rem 1rem;
+        border-radius: 12px;
+    }
+
+    .hero-panel-mobile {
+        padding: 1rem;
+    }
+
+    .hero-panel .badge {
+        white-space: normal;
+        line-height: 1.35;
+        text-align: left;
+    }
+
+    .hero-panel h1 {
+        font-size: 1.55rem;
+        line-height: 1.25;
+    }
+
+    .hero-panel .lead {
+        font-size: 0.98rem;
+    }
+
+    .quick-actions {
+        padding: 0.9rem !important;
+    }
+
+    .section-title {
+        font-size: 1.25rem;
+    }
+
+    .catalog-header {
+        align-items: flex-start !important;
+    }
+
+    .catalog-count {
+        width: 100%;
+    }
+
+    .book-card img {
+        height: 200px;
+    }
+
+    .book-card .btn {
+        width: 100%;
+    }
 }
