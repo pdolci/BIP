@@ -1,6 +1,7 @@
 import os
 import datetime
 import re
+import random
 from sqlalchemy import or_, and_
 from sqlalchemy.orm import joinedload
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash, send_from_directory
@@ -37,6 +38,21 @@ app_routes = Blueprint("app_routes", __name__)
 
 WEEKDAY_CHOICES = {"0", "1", "2", "3", "4", "5", "6"}
 MAX_ACTIVE_SUBSCRIPTIONS = 3
+ORIGIN_QUOTES_FILE = os.path.join(os.path.dirname(__file__), "Origin.txt")
+
+
+def _get_random_origin_quote():
+    try:
+        with open(ORIGIN_QUOTES_FILE, "r", encoding="utf-8", errors="replace") as source:
+            quotes = [line.strip() for line in source if line.strip()]
+    except OSError as error:
+        logging.warning(f"⚠️ Impossibile leggere Origin.txt: {error}")
+        return None
+
+    if not quotes:
+        return None
+
+    return random.choice(quotes)
 
 
 def _normalize_tags(tags_value):
@@ -237,7 +253,8 @@ def ensure_uploads_folder():
 @app_routes.route("/")
 def index():
     books = Book.query.filter_by(is_active=True).order_by(Book.title.asc()).all()
-    return render_template("index.html", books=books)
+    random_quote = _get_random_origin_quote()
+    return render_template("index.html", books=books, random_quote=random_quote)
 
 @app_routes.route("/register", methods=["GET", "POST"])
 def register():

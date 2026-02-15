@@ -9,6 +9,9 @@
                 <span class="badge rounded-pill mb-3 px-3 py-2"><i class="bi bi-stars me-2"></i>Piattaforma di lettura intelligente</span>
                 <h1 class="display-6 mb-3">Leggi con costanza, senza stress.</h1>
                 <p class="lead mb-0">Books in Pieces ti aiuta a trasformare la lettura in un'abitudine: scegli un libro, imposta il ritmo e ricevi contenuti pronti da leggere ogni giorno.</p>
+                {% if random_quote %}
+                    <p class="text-muted fst-italic mt-3 mb-0">{{ random_quote }}</p>
+                {% endif %}
             </div>
             <div class="col-lg-4">
                 <div class="quick-actions p-3">
