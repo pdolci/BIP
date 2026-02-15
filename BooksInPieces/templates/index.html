@@ -1,53 +1,117 @@
 {% extends "base.html" %}
 
 {% block content %}
-<section class="hero-panel text-center mb-5">
-    <span class="badge rounded-pill mb-3 px-3 py-2"><i class="bi bi-stars me-2"></i>Piattaforma di lettura intelligente</span>
-    <h1 class="display-5 fw-bold">Benvenuto su Books in Pieces</h1>
-    <p class="lead mx-auto" style="max-width: 700px;">Leggi in modo costante con sessioni brevi, progressi chiari e suggerimenti quotidiani per trasformare la lettura in un'abitudine.</p>
-</section>
+<!-- Desktop / tablet content -->
+<div class="d-none d-md-block">
+    <section class="hero-panel mb-4 hero-panel-desktop">
+        <div class="row align-items-center g-4">
+            <div class="col-lg-8">
+                <span class="badge rounded-pill mb-3 px-3 py-2"><i class="bi bi-stars me-2"></i>Piattaforma di lettura intelligente</span>
+                <h1 class="display-6 mb-3">Leggi con costanza, senza stress.</h1>
+                <p class="lead mb-0">Books in Pieces ti aiuta a trasformare la lettura in un'abitudine: scegli un libro, imposta il ritmo e ricevi contenuti pronti da leggere ogni giorno.</p>
+            </div>
+            <div class="col-lg-4">
+                <div class="quick-actions p-3">
+                    <h6 class="fw-bold mb-2"><i class="bi bi-lightning-charge me-1"></i>Inizia subito</h6>
+                    <p class="small text-muted mb-3">Configura il tuo prossimo libro in meno di un minuto.</p>
+                    {% if 'user_id' in session %}
+                        <a class="btn btn-primary w-100" href="{{ url_for('app_routes.select_book') }}">Vai ai miei libri</a>
+                    {% else %}
+                        <a class="btn btn-primary w-100" href="{{ url_for('app_routes.register') }}">Crea un account</a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </section>
 
-<section class="row g-4 mb-5">
-    <div class="col-md-4">
-        <div class="stat-card p-4 h-100">
-            <i class="bi bi-clock-history fs-3 text-primary"></i>
-            <h5 class="mt-3">Sessioni brevi</h5>
-            <p class="text-muted mb-0">Programma minuti di lettura sostenibili ogni giorno.</p>
+    <section class="row g-3 mb-5">
+        <div class="col-md-4">
+            <div class="stat-card p-4 h-100">
+                <i class="bi bi-clock-history fs-3"></i>
+                <h5 class="mt-3">Sessioni brevi e sostenibili</h5>
+                <p class="text-muted mb-0">Programma pochi minuti al giorno e mantieni la continuità.</p>
+            </div>
         </div>
-    </div>
-    <div class="col-md-4">
-        <div class="stat-card p-4 h-100">
-            <i class="bi bi-envelope-check fs-3 text-primary"></i>
-            <h5 class="mt-3">Promemoria automatici</h5>
-            <p class="text-muted mb-0">Ricevi estratti e contenuti direttamente via email.</p>
+        <div class="col-md-4">
+            <div class="stat-card p-4 h-100">
+                <i class="bi bi-envelope-check fs-3"></i>
+                <h5 class="mt-3">Promemoria automatici</h5>
+                <p class="text-muted mb-0">Ricevi via email estratti e indicazioni pratiche di lettura.</p>
+            </div>
         </div>
-    </div>
-    <div class="col-md-4">
-        <div class="stat-card p-4 h-100">
-            <i class="bi bi-journal-bookmark fs-3 text-primary"></i>
-            <h5 class="mt-3">Catalogo curato</h5>
-            <p class="text-muted mb-0">Scegli i libri attivi e avvia subito il tuo percorso.</p>
+        <div class="col-md-4">
+            <div class="stat-card p-4 h-100">
+                <i class="bi bi-journal-bookmark fs-3"></i>
+                <h5 class="mt-3">Catalogo chiaro e ordinato</h5>
+                <p class="text-muted mb-0">Scopri i libri disponibili e scegli il prossimo titolo con facilità.</p>
+            </div>
         </div>
-    </div>
-</section>
+    </section>
+</div>
 
-<section>
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h2 class="section-title mb-0"><i class="bi bi-book me-2"></i>Libri Disponibili</h2>
+<!-- Mobile content -->
+<div class="d-md-none">
+    <section class="hero-panel mb-3 hero-panel-mobile">
+        <span class="badge rounded-pill mb-2 px-3 py-2"><i class="bi bi-stars me-2"></i>Lettura smart</span>
+        <h1 class="h3 mb-2">Leggi ogni giorno, con semplicità.</h1>
+        <p class="mb-3">Scegli un libro, imposta il ritmo e ricevi contenuti pronti via email.</p>
+        {% if 'user_id' in session %}
+            <a class="btn btn-primary w-100 mb-2" href="{{ url_for('app_routes.select_book') }}">I miei libri</a>
+        {% else %}
+            <a class="btn btn-primary w-100 mb-2" href="{{ url_for('app_routes.register') }}">Crea account</a>
+        {% endif %}
+        <a class="btn btn-outline-primary w-100" href="#catalogo-libri">Scopri i libri</a>
+    </section>
+
+    <section class="mobile-benefits mb-4">
+        <div class="stat-card p-3 mb-2">
+            <div class="d-flex align-items-start gap-2">
+                <i class="bi bi-clock-history fs-5"></i>
+                <div>
+                    <h6 class="mb-1">Sessioni brevi</h6>
+                    <p class="small text-muted mb-0">Pochi minuti al giorno, sempre sostenibili.</p>
+                </div>
+            </div>
+        </div>
+        <div class="stat-card p-3 mb-2">
+            <div class="d-flex align-items-start gap-2">
+                <i class="bi bi-envelope-check fs-5"></i>
+                <div>
+                    <h6 class="mb-1">Promemoria utili</h6>
+                    <p class="small text-muted mb-0">Estratti e suggerimenti direttamente in email.</p>
+                </div>
+            </div>
+        </div>
+        <div class="stat-card p-3">
+            <div class="d-flex align-items-start gap-2">
+                <i class="bi bi-journal-bookmark fs-5"></i>
+                <div>
+                    <h6 class="mb-1">Catalogo semplice</h6>
+                    <p class="small text-muted mb-0">Trova il prossimo titolo in modo rapido.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+</div>
+
+<section id="catalogo-libri">
+    <div class="catalog-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+        <h2 class="section-title mb-0"><i class="bi bi-book me-2"></i>Libri disponibili</h2>
+        <span class="catalog-count text-muted small">{{ books|length }} titoli</span>
     </div>
     <div class="row g-4">
         {% for book in books %}
-            <div class="col-md-6 col-lg-4">
+            <div class="col-sm-6 col-lg-4">
                 <div class="card book-card h-100">
                     <img src="{{ book.cover_image or 'https://images.unsplash.com/photo-1512820790803-83ca734da794?auto=format&fit=crop&w=800&q=80' }}" alt="{{ book.title }}" class="card-img-top">
                     <div class="card-body d-flex flex-column">
                         <h5 class="card-title">{{ book.title }}</h5>
                         <p class="text-muted flex-grow-1">{{ book.short_description or "Nessuna descrizione disponibile." }}</p>
                         <button class="btn btn-outline-primary mt-2" type="button" data-bs-toggle="collapse" data-bs-target="#details-{{ book.id }}" aria-expanded="false" aria-controls="details-{{ book.id }}">
-                            <i class="bi bi-info-circle me-1"></i>Mostra dettagli
+                            <i class="bi bi-info-circle me-1"></i>Dettagli
                         </button>
                         <div class="collapse mt-3" id="details-{{ book.id }}">
-                            <div class="small text-secondary">Inizia subito a leggere questo titolo impostando il tuo piano personale.</div>
+                            <div class="small text-secondary">Configura un piano personale e inizia subito a leggere questo libro.</div>
                         </div>
                     </div>
                 </div>
