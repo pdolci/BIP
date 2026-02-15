@@ -31,7 +31,7 @@ import logging
 from time_utils import utc_now_naive, local_now_naive, local_naive_to_utc_naive
 
 UPLOAD_FOLDER = Config.UPLOAD_FOLDER
-ALLOWED_EXTENSIONS = {"txt"}
+ALLOWED_EXTENSIONS = {"txt", "html", "htm"}
 
 app_routes = Blueprint("app_routes", __name__)
 
@@ -817,7 +817,7 @@ def upload_book():
         db.session.commit()
         flash("Libro caricato con successo!")
     else:
-        flash("Formato non supportato. Carica solo file .txt.")
+        flash("Formato non supportato. Carica file .txt, .html o .htm.")
 
     return redirect(url_for("app_routes.manage_books"))
 
