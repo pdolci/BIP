@@ -74,4 +74,4 @@ python scheduler_worker.py
 ## Note operative
 
 - Lo scheduler **non** viene più avviato automaticamente dal processo web.
-- I file libro caricabili sono limitati a `.txt` per ridurre il rischio XSS dovuto a file HTML serviti dalla stessa origin.
+- I file libro caricabili supportano `.txt`, `.html` e `.htm`; il parsing di invio converte l'HTML in testo per conteggio parole e chunking.

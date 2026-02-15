@@ -135,6 +135,23 @@ def sanitize_source_text(content):
     return normalized
 
 
+def normalize_html_for_chunking(content):
+    """Rimuove sezioni non narrative HTML per rendere stabile il chunking a parole."""
+    normalized = sanitize_source_text(content)
+    normalized = re.sub(r"<!--.*?-->", "", normalized, flags=re.DOTALL)
+    normalized = re.sub(r"<script.*?>.*?</script>", "", normalized, flags=re.IGNORECASE | re.DOTALL)
+    normalized = re.sub(r"<style.*?>.*?</style>", "", normalized, flags=re.IGNORECASE | re.DOTALL)
+    normalized = re.sub(r"<noscript.*?>.*?</noscript>", "", normalized, flags=re.IGNORECASE | re.DOTALL)
+    normalized = re.sub(r"<template.*?>.*?</template>", "", normalized, flags=re.IGNORECASE | re.DOTALL)
+
+    body_match = re.search(r"<body\b[^>]*>(.*?)</body>", normalized, flags=re.IGNORECASE | re.DOTALL)
+    if body_match:
+        return body_match.group(1)
+
+    # fallback: rimuove almeno la sezione <head> se non troviamo <body>
+    return re.sub(r"<head.*?>.*?</head>", "", normalized, flags=re.IGNORECASE | re.DOTALL)
+
+
 def html_to_text(content):
     content = sanitize_source_text(content)
     content = re.sub(r"<script.*?>.*?</script>", "", content, flags=re.IGNORECASE | re.DOTALL)
@@ -272,7 +289,7 @@ def count_total_words(file_path):
         with open(file_path, "r", encoding=encoding, errors="replace") as source:
             content = sanitize_source_text(source.read())
             if is_html_file(file_path):
-                content = html_to_text(content)
+                content = html_to_text(normalize_html_for_chunking(content))
             return len(re.findall(r"\S+", content))
     except Exception as error:
         logging.warning(f"⚠️ Impossibile contare parole file {file_path}: {error}")
@@ -290,7 +307,8 @@ def read_file_chunk(file_path, start_idx, length):
             source_content = sanitize_source_text(source.read())
             source_is_html = is_html_file(file_path)
             if source_is_html:
-                chunk, new_index = extract_html_chunk(source_content, start_idx, length)
+                normalized_html = normalize_html_for_chunking(source_content)
+                chunk, new_index = extract_html_chunk(normalized_html, start_idx, length)
                 if chunk is None:
                     return None, start_idx, source_is_html
                 return chunk, new_index, source_is_html
