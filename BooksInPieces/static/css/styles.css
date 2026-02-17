@@ -139,6 +139,14 @@ body {
     font-weight: 700;
 }
 
+.book-description-preview {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
 .section-title {
     font-weight: 800;
     color: #0f172a;
