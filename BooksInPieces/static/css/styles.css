@@ -147,6 +147,10 @@ body {
     text-overflow: ellipsis;
 }
 
+.book-description-preview.is-expanded {
+    -webkit-line-clamp: unset;
+}
+
 .section-title {
     font-weight: 800;
     color: #0f172a;
