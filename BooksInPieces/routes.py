@@ -495,6 +495,7 @@ def select_book():
     filter_tags = request.args.get("tags", "").strip()
     filter_language = request.args.get("language", "").strip()
     filter_max_hours = request.args.get("max_hours", "").strip()
+    selected_book_id = request.args.get("selected_book_id", type=int)
 
     filters = _build_book_filters(
         search_query,
@@ -509,6 +510,9 @@ def select_book():
     if filters:
         books_query = books_query.filter(*filters)
     books = books_query.order_by(Book.title.asc()).all()
+    selected_book = next((book for book in books if book.id == selected_book_id), None)
+    if not selected_book and books:
+        selected_book = books[0]
 
     dashboard = _build_dashboard(active_schedules)
     user = User.query.get(user_id)
@@ -527,6 +531,7 @@ def select_book():
         filter_tags=filter_tags,
         filter_language=filter_language,
         filter_max_hours=filter_max_hours,
+        selected_book=selected_book,
         normalize_tags=_normalize_tags,
         delivery_email=DELIVERY_EMAIL,
         delivery_telegram=DELIVERY_TELEGRAM,
