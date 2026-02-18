@@ -60,6 +60,7 @@
                         {% for book in books %}
                             <option
                                 value="{{ book.id }}"
+                                {% if selected_book and book.id == selected_book.id %}selected{% endif %}
                                 data-title="{{ book.title }}"
                                 data-author="{{ book.author or 'Autore n/d' }}"
                                 data-year="{{ book.publication_year or 'Anno n/d' }}"
@@ -79,18 +80,18 @@
                 <div class="mb-3 p-3 border rounded bg-light" id="book-preview">
                     <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
                         <div>
-                            <strong id="preview-title">{{ books[0].title }}</strong>
+                            <strong id="preview-title">{{ selected_book.title }}</strong>
                             <div class="text-muted small" id="preview-meta">
-                                {{ books[0].author or 'Autore n/d' }} · {{ books[0].publication_year or 'Anno n/d' }} · {{ books[0].genre or 'Genere n/d' }} · {{ books[0].language or 'Lingua n/d' }}
+                                {{ selected_book.author or 'Autore n/d' }} · {{ selected_book.publication_year or 'Anno n/d' }} · {{ selected_book.genre or 'Genere n/d' }} · {{ selected_book.language or 'Lingua n/d' }}
                             </div>
                         </div>
                         <span class="badge text-bg-primary" id="preview-hours">
-                            {% if books[0].estimated_reading_hours %}{{ books[0].estimated_reading_hours }} ore{% else %}Durata n/d{% endif %}
+                            {% if selected_book.estimated_reading_hours %}{{ selected_book.estimated_reading_hours }} ore{% else %}Durata n/d{% endif %}
                         </span>
                     </div>
-                    <div class="small mt-2" id="preview-description">{{ books[0].short_description or 'Nessuna descrizione disponibile.' }}</div>
+                    <div class="small mt-2" id="preview-description">{{ selected_book.short_description or 'Nessuna descrizione disponibile.' }}</div>
                     <div class="small text-muted mt-2" id="preview-tags">
-                        {% if books[0].tags %}Tag: {{ books[0].tags }}{% else %}Tag: n/d{% endif %}
+                        {% if selected_book.tags %}Tag: {{ selected_book.tags }}{% else %}Tag: n/d{% endif %}
                     </div>
                 </div>
                 {% else %}

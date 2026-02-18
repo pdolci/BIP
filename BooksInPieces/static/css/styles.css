@@ -139,16 +139,18 @@ body {
     font-weight: 700;
 }
 
+.book-card-link {
+    display: block;
+    height: 100%;
+    color: inherit;
+}
+
 .book-description-preview {
     display: -webkit-box;
     -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
+    -webkit-line-clamp: 3;
     overflow: hidden;
     text-overflow: ellipsis;
-}
-
-.book-description-preview.is-expanded {
-    -webkit-line-clamp: unset;
 }
 
 .section-title {
@@ -275,7 +277,4 @@ body {
         height: 200px;
     }
 
-    .book-card .btn {
-        width: 100%;
-    }
 }
