@@ -52,7 +52,18 @@
 
     <div class="col-lg-10">
         <div class="card panel-card p-4">
-            <h2 class="mb-4"><i class="bi bi-sliders me-2"></i>Configura la tua lettura</h2>
+            <div class="d-flex justify-content-between align-items-start gap-3 mb-4">
+                <h2 class="mb-0"><i class="bi bi-sliders me-2"></i>Configura la tua lettura</h2>
+                {% if books %}
+                <img
+                    id="selected-book-cover"
+                    class="selected-book-cover"
+                    src="{{ selected_book.cover_image or 'https://images.unsplash.com/photo-1512820790803-83ca734da794?auto=format&fit=crop&w=800&q=80' }}"
+                    alt="Copertina del libro selezionato"
+                    loading="lazy"
+                >
+                {% endif %}
+            </div>
             <form method="POST">
                 <div class="mb-3">
                     <label class="form-label">Scegli un libro ({{ books|length }} risultati)</label>
@@ -69,6 +80,7 @@
                                 data-tags="{{ book.tags or '' }}"
                                 data-description="{{ book.short_description or '' }}"
                                 data-hours="{{ book.estimated_reading_hours or '' }}"
+                                data-cover="{{ book.cover_image or 'https://images.unsplash.com/photo-1512820790803-83ca734da794?auto=format&fit=crop&w=800&q=80' }}"
                             >
                                 {{ book.title }}{% if book.author %} — {{ book.author }}{% endif %}{% if book.estimated_reading_hours %} · {{ book.estimated_reading_hours }}h{% endif %}
                             </option>
@@ -155,6 +167,7 @@
     const deliveryChannelSelect = document.getElementById("delivery-channel");
     const telegramHandleGroup = document.getElementById("telegram-handle-group");
     const bookSelect = document.getElementById("book-select");
+    const selectedBookCover = document.getElementById("selected-book-cover");
 
     const updateFrequencyFields = () => {
         const value = frequencySelect.value;
@@ -180,12 +193,18 @@
         const description = selected.dataset.description || "Nessuna descrizione disponibile.";
         const tags = selected.dataset.tags || "n/d";
         const hours = selected.dataset.hours ? `${selected.dataset.hours} ore` : "Durata n/d";
+        const cover = selected.dataset.cover || "https://images.unsplash.com/photo-1512820790803-83ca734da794?auto=format&fit=crop&w=800&q=80";
 
         document.getElementById("preview-title").textContent = title;
         document.getElementById("preview-meta").textContent = `${author} · ${year} · ${genre} · ${language}`;
         document.getElementById("preview-description").textContent = description;
         document.getElementById("preview-tags").textContent = `Tag: ${tags}`;
         document.getElementById("preview-hours").textContent = hours;
+
+        if (selectedBookCover) {
+            selectedBookCover.src = cover;
+            selectedBookCover.alt = `Copertina di ${title}`;
+        }
     };
 
     frequencySelect.addEventListener("change", updateFrequencyFields);
