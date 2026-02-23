@@ -66,6 +66,7 @@ class Config:
 
     BASE_DIR = os.path.abspath(os.path.dirname(__file__))
     UPLOAD_FOLDER = os.path.join(BASE_DIR, "uploads", "books")
+    COVER_UPLOAD_FOLDER = os.path.join(BASE_DIR, "uploads", "covers")
 
     SQLALCHEMY_DATABASE_URI = _get_required_env("DATABASE_URL")
     SQLALCHEMY_TRACK_MODIFICATIONS = False
