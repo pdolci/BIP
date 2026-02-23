@@ -35,7 +35,6 @@ from time_utils import utc_now_naive, local_now_naive, local_naive_to_utc_naive
 UPLOAD_FOLDER = Config.UPLOAD_FOLDER
 ALLOWED_EXTENSIONS = {"txt", "html", "htm"}
 ALLOWED_IMAGE_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp"}
-MAX_COVER_IMAGE_SIZE_BYTES = 2 * 1024 * 1024
 
 app_routes = Blueprint("app_routes", __name__)
 
@@ -68,15 +67,15 @@ def _normalize_tags(tags_value):
 
 def _extract_cover_data(file_storage):
     if not file_storage or not file_storage.filename:
-        return None, None, None
+        return None, None
 
     filename = secure_filename(file_storage.filename)
     if "." not in filename:
-        return None, None, "invalid_extension"
+        return None, None
 
     extension = filename.rsplit(".", 1)[1].lower()
     if extension not in ALLOWED_IMAGE_EXTENSIONS:
-        return None, None, "invalid_extension"
+        return None, None
 
     mime_type = (file_storage.mimetype or "").strip().lower()
     if not mime_type.startswith("image/"):
@@ -84,12 +83,9 @@ def _extract_cover_data(file_storage):
 
     data = file_storage.read()
     if not data:
-        return None, None, "empty_file"
+        return None, None
 
-    if len(data) > MAX_COVER_IMAGE_SIZE_BYTES:
-        return None, None, "file_too_large"
-
-    return data, mime_type, None
+    return data, mime_type
 
 def _build_book_filters(search_query, author, year, genre, tags, language, max_hours):
     filters = []
@@ -852,14 +848,9 @@ def upload_book():
 
         calculated_word_count = count_total_words(file_path)
 
-        cover_image_data, cover_image_mime, cover_error = _extract_cover_data(cover_image_file)
-        if cover_error:
-            if cover_error == "file_too_large":
-                flash("La copertina supera 2 MB. Carica un'immagine più leggera.")
-            elif cover_error == "empty_file":
-                flash("Il file della copertina è vuoto.")
-            else:
-                flash("Formato copertina non supportato. Usa PNG, JPG, GIF o WEBP.")
+        cover_image_data, cover_image_mime = _extract_cover_data(cover_image_file)
+        if cover_image_file and cover_image_file.filename and not cover_image_data:
+            flash("Formato copertina non supportato. Usa PNG, JPG, GIF o WEBP.")
             return redirect(url_for("app_routes.manage_books"))
 
         new_book = Book(
@@ -922,15 +913,10 @@ def edit_book(book_id):
     book.estimated_reading_hours = parsed_estimated_hours
     cover_image = (request.form.get("cover_image") or "").strip() or None
     cover_image_file = request.files.get("cover_image_file")
-    cover_image_data, cover_image_mime, cover_error = _extract_cover_data(cover_image_file)
+    cover_image_data, cover_image_mime = _extract_cover_data(cover_image_file)
 
-    if cover_error:
-        if cover_error == "file_too_large":
-            flash("La copertina supera 2 MB. Carica un'immagine più leggera.")
-        elif cover_error == "empty_file":
-            flash("Il file della copertina è vuoto.")
-        else:
-            flash("Formato copertina non supportato. Usa PNG, JPG, GIF o WEBP.")
+    if cover_image_file and cover_image_file.filename and not cover_image_data:
+        flash("Formato copertina non supportato. Usa PNG, JPG, GIF o WEBP.")
         return redirect(url_for("app_routes.manage_books"))
 
     if cover_image_data:
