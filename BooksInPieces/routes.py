@@ -2,9 +2,10 @@ import os
 import datetime
 import re
 import random
+import io
 from sqlalchemy import or_, and_
 from sqlalchemy.orm import joinedload
-from flask import Blueprint, render_template, request, redirect, url_for, session, flash, send_from_directory
+from flask import Blueprint, render_template, request, redirect, url_for, session, flash, send_from_directory, send_file
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 from werkzeug.utils import secure_filename
 from extensions import db
@@ -33,6 +34,8 @@ from time_utils import utc_now_naive, local_now_naive, local_naive_to_utc_naive
 
 UPLOAD_FOLDER = Config.UPLOAD_FOLDER
 ALLOWED_EXTENSIONS = {"txt", "html", "htm"}
+ALLOWED_IMAGE_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp"}
+MAX_COVER_IMAGE_SIZE_BYTES = 2 * 1024 * 1024
 
 app_routes = Blueprint("app_routes", __name__)
 
@@ -60,6 +63,33 @@ def _normalize_tags(tags_value):
         return []
     return [tag.strip() for tag in tags_value.split(",") if tag.strip()]
 
+
+
+
+def _extract_cover_data(file_storage):
+    if not file_storage or not file_storage.filename:
+        return None, None, None
+
+    filename = secure_filename(file_storage.filename)
+    if "." not in filename:
+        return None, None, "invalid_extension"
+
+    extension = filename.rsplit(".", 1)[1].lower()
+    if extension not in ALLOWED_IMAGE_EXTENSIONS:
+        return None, None, "invalid_extension"
+
+    mime_type = (file_storage.mimetype or "").strip().lower()
+    if not mime_type.startswith("image/"):
+        mime_type = f"image/{extension if extension != 'jpg' else 'jpeg'}"
+
+    data = file_storage.read()
+    if not data:
+        return None, None, "empty_file"
+
+    if len(data) > MAX_COVER_IMAGE_SIZE_BYTES:
+        return None, None, "file_too_large"
+
+    return data, mime_type, None
 
 def _build_book_filters(search_query, author, year, genre, tags, language, max_hours):
     filters = []
@@ -792,7 +822,8 @@ def upload_book():
     tags = request.form.get("tags")
     language = request.form.get("language")
     estimated_reading_hours = request.form.get("estimated_reading_hours")
-    cover_image = request.form.get("cover_image")
+    cover_image = (request.form.get("cover_image") or "").strip() or None
+    cover_image_file = request.files.get("cover_image_file")
 
     if file.filename == "":
         flash("Nessun file scelto!")
@@ -821,6 +852,16 @@ def upload_book():
 
         calculated_word_count = count_total_words(file_path)
 
+        cover_image_data, cover_image_mime, cover_error = _extract_cover_data(cover_image_file)
+        if cover_error:
+            if cover_error == "file_too_large":
+                flash("La copertina supera 2 MB. Carica un'immagine più leggera.")
+            elif cover_error == "empty_file":
+                flash("Il file della copertina è vuoto.")
+            else:
+                flash("Formato copertina non supportato. Usa PNG, JPG, GIF o WEBP.")
+            return redirect(url_for("app_routes.manage_books"))
+
         new_book = Book(
             title=title,
             file_path=filename,
@@ -832,7 +873,9 @@ def upload_book():
             tags=tags,
             language=language,
             estimated_reading_hours=parsed_estimated_hours,
-            cover_image=cover_image,
+            cover_image=cover_image if not cover_image_data else None,
+            cover_image_data=cover_image_data,
+            cover_image_mime=cover_image_mime,
             word_count=calculated_word_count,
         )
         db.session.add(new_book)
@@ -877,7 +920,28 @@ def edit_book(book_id):
     book.tags = (request.form.get("tags") or "").strip() or None
     book.language = (request.form.get("language") or "").strip() or None
     book.estimated_reading_hours = parsed_estimated_hours
-    book.cover_image = (request.form.get("cover_image") or "").strip() or None
+    cover_image = (request.form.get("cover_image") or "").strip() or None
+    cover_image_file = request.files.get("cover_image_file")
+    cover_image_data, cover_image_mime, cover_error = _extract_cover_data(cover_image_file)
+
+    if cover_error:
+        if cover_error == "file_too_large":
+            flash("La copertina supera 2 MB. Carica un'immagine più leggera.")
+        elif cover_error == "empty_file":
+            flash("Il file della copertina è vuoto.")
+        else:
+            flash("Formato copertina non supportato. Usa PNG, JPG, GIF o WEBP.")
+        return redirect(url_for("app_routes.manage_books"))
+
+    if cover_image_data:
+        book.cover_image_data = cover_image_data
+        book.cover_image_mime = cover_image_mime
+        book.cover_image = None
+    else:
+        book.cover_image = cover_image
+        if cover_image:
+            book.cover_image_data = None
+            book.cover_image_mime = None
 
     file_path = book.get_absolute_path()
     if os.path.exists(file_path):
@@ -892,6 +956,19 @@ def edit_book(book_id):
 def uploaded_file(filename):
     ensure_uploads_folder()
     return send_from_directory(UPLOAD_FOLDER, filename)
+
+@app_routes.route("/book_cover/<int:book_id>")
+def book_cover(book_id):
+    book = Book.query.get_or_404(book_id)
+    if not book.cover_image_data:
+        return redirect(book.cover_image) if book.cover_image else redirect("https://images.unsplash.com/photo-1512820790803-83ca734da794?auto=format&fit=crop&w=800&q=80")
+
+    return send_file(
+        io.BytesIO(book.cover_image_data),
+        mimetype=book.cover_image_mime or "image/jpeg",
+        as_attachment=False,
+        download_name=f"book_{book.id}_cover",
+    )
 
 @app_routes.route("/admin/book/delete/<int:book_id>", methods=["POST"])
 def delete_book(book_id):
