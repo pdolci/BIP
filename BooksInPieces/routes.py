@@ -2,12 +2,12 @@ import os
 import datetime
 import re
 import random
-import io
 from sqlalchemy import or_, and_
 from sqlalchemy.orm import joinedload
-from flask import Blueprint, render_template, request, redirect, url_for, session, flash, send_from_directory, send_file
+from flask import Blueprint, render_template, request, redirect, url_for, session, flash, send_from_directory
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 from werkzeug.utils import secure_filename
+import uuid
 from extensions import db
 from models import User, Book, ReadingSchedule, DeliveryEvent
 from email_sender import (
@@ -33,6 +33,7 @@ import logging
 from time_utils import utc_now_naive, local_now_naive, local_naive_to_utc_naive
 
 UPLOAD_FOLDER = Config.UPLOAD_FOLDER
+COVER_UPLOAD_FOLDER = Config.COVER_UPLOAD_FOLDER
 ALLOWED_EXTENSIONS = {"txt", "html", "htm"}
 ALLOWED_IMAGE_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp"}
 
@@ -65,27 +66,48 @@ def _normalize_tags(tags_value):
 
 
 
-def _extract_cover_data(file_storage):
+def _extract_cover_file_extension(file_storage):
     if not file_storage or not file_storage.filename:
-        return None, None
+        return None
 
     filename = secure_filename(file_storage.filename)
     if "." not in filename:
-        return None, None
+        return None
 
     extension = filename.rsplit(".", 1)[1].lower()
     if extension not in ALLOWED_IMAGE_EXTENSIONS:
-        return None, None
+        return None
 
-    mime_type = (file_storage.mimetype or "").strip().lower()
-    if not mime_type.startswith("image/"):
-        mime_type = f"image/{extension if extension != 'jpg' else 'jpeg'}"
+    return extension
 
-    data = file_storage.read()
-    if not data:
-        return None, None
 
-    return data, mime_type
+def ensure_cover_uploads_folder():
+    """ Crea la cartella uploads/covers se non esiste """
+    try:
+        os.makedirs(COVER_UPLOAD_FOLDER, exist_ok=True)
+    except Exception as e:
+        logging.error(f"❌ Errore nella creazione della cartella copertine: {e}")
+
+
+def _store_cover_on_disk(file_storage):
+    extension = _extract_cover_file_extension(file_storage)
+    if not extension:
+        return None
+
+    ensure_cover_uploads_folder()
+    cover_filename = f"{uuid.uuid4().hex}.{extension}"
+    destination = os.path.join(COVER_UPLOAD_FOLDER, cover_filename)
+    file_storage.save(destination)
+    return cover_filename
+
+
+def _delete_local_cover_if_present(cover_image):
+    if not cover_image or not cover_image.startswith("covers/"):
+        return
+
+    local_path = os.path.join(Config.BASE_DIR, "uploads", cover_image)
+    if os.path.exists(local_path):
+        os.remove(local_path)
 
 def _build_book_filters(search_query, author, year, genre, tags, language, max_hours):
     filters = []
@@ -848,8 +870,8 @@ def upload_book():
 
         calculated_word_count = count_total_words(file_path)
 
-        cover_image_data, cover_image_mime = _extract_cover_data(cover_image_file)
-        if cover_image_file and cover_image_file.filename and not cover_image_data:
+        cover_filename = _store_cover_on_disk(cover_image_file) if cover_image_file and cover_image_file.filename else None
+        if cover_image_file and cover_image_file.filename and not cover_filename:
             flash("Formato copertina non supportato. Usa PNG, JPG, GIF o WEBP.")
             return redirect(url_for("app_routes.manage_books"))
 
@@ -864,9 +886,7 @@ def upload_book():
             tags=tags,
             language=language,
             estimated_reading_hours=parsed_estimated_hours,
-            cover_image=cover_image if not cover_image_data else None,
-            cover_image_data=cover_image_data,
-            cover_image_mime=cover_image_mime,
+            cover_image=f"covers/{cover_filename}" if cover_filename else cover_image,
             word_count=calculated_word_count,
         )
         db.session.add(new_book)
@@ -913,21 +933,18 @@ def edit_book(book_id):
     book.estimated_reading_hours = parsed_estimated_hours
     cover_image = (request.form.get("cover_image") or "").strip() or None
     cover_image_file = request.files.get("cover_image_file")
-    cover_image_data, cover_image_mime = _extract_cover_data(cover_image_file)
+    cover_filename = _store_cover_on_disk(cover_image_file) if cover_image_file and cover_image_file.filename else None
 
-    if cover_image_file and cover_image_file.filename and not cover_image_data:
+    if cover_image_file and cover_image_file.filename and not cover_filename:
         flash("Formato copertina non supportato. Usa PNG, JPG, GIF o WEBP.")
         return redirect(url_for("app_routes.manage_books"))
 
-    if cover_image_data:
-        book.cover_image_data = cover_image_data
-        book.cover_image_mime = cover_image_mime
-        book.cover_image = None
-    else:
+    if cover_filename:
+        _delete_local_cover_if_present(book.cover_image)
+        book.cover_image = f"covers/{cover_filename}"
+    elif cover_image:
+        _delete_local_cover_if_present(book.cover_image)
         book.cover_image = cover_image
-        if cover_image:
-            book.cover_image_data = None
-            book.cover_image_mime = None
 
     file_path = book.get_absolute_path()
     if os.path.exists(file_path):
@@ -943,18 +960,24 @@ def uploaded_file(filename):
     ensure_uploads_folder()
     return send_from_directory(UPLOAD_FOLDER, filename)
 
+
+@app_routes.route("/uploads/covers/<filename>")
+def uploaded_cover(filename):
+    ensure_cover_uploads_folder()
+    return send_from_directory(COVER_UPLOAD_FOLDER, filename)
+
+
 @app_routes.route("/book_cover/<int:book_id>")
 def book_cover(book_id):
     book = Book.query.get_or_404(book_id)
-    if not book.cover_image_data:
-        return redirect(book.cover_image) if book.cover_image else redirect("https://images.unsplash.com/photo-1512820790803-83ca734da794?auto=format&fit=crop&w=800&q=80")
+    if not book.cover_image:
+        return redirect("https://images.unsplash.com/photo-1512820790803-83ca734da794?auto=format&fit=crop&w=800&q=80")
 
-    return send_file(
-        io.BytesIO(book.cover_image_data),
-        mimetype=book.cover_image_mime or "image/jpeg",
-        as_attachment=False,
-        download_name=f"book_{book.id}_cover",
-    )
+    if book.cover_image.startswith("covers/"):
+        cover_filename = book.cover_image.split("/", 1)[1]
+        return redirect(url_for("app_routes.uploaded_cover", filename=cover_filename))
+
+    return redirect(book.cover_image)
 
 @app_routes.route("/admin/book/delete/<int:book_id>", methods=["POST"])
 def delete_book(book_id):
@@ -968,6 +991,7 @@ def delete_book(book_id):
         try:
             if os.path.exists(file_path):
                 os.remove(file_path)
+            _delete_local_cover_if_present(book.cover_image)
             db.session.delete(book)
             db.session.commit()
             flash("Libro eliminato!")

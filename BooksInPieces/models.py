@@ -35,8 +35,6 @@ class Book(db.Model):
     language = db.Column(db.String(80), nullable=True)
     estimated_reading_hours = db.Column(db.Float, nullable=True)
     cover_image = db.Column(db.String(500), nullable=True)
-    cover_image_data = db.Column(db.LargeBinary, nullable=True)
-    cover_image_mime = db.Column(db.String(120), nullable=True)
     word_count = db.Column(db.Integer, nullable=False, default=0)
 
     def get_absolute_path(self):

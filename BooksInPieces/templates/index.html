@@ -111,7 +111,7 @@
                     aria-label="Apri {{ book.title }} in I miei libri"
                 >
                     <div class="card book-card h-100">
-                        <img src="{{ url_for('app_routes.book_cover', book_id=book.id) if book.cover_image_data else (book.cover_image or 'https://images.unsplash.com/photo-1512820790803-83ca734da794?auto=format&fit=crop&w=800&q=80') }}" alt="{{ book.title }}" class="card-img-top">
+                        <img src="{{ url_for('app_routes.book_cover', book_id=book.id) }}" alt="{{ book.title }}" class="card-img-top">
                         <div class="card-body d-flex flex-column">
                             <h5 class="card-title">{{ book.title }}</h5>
                             <p class="text-muted flex-grow-1 book-description-preview">{{ book.short_description or "Nessuna descrizione disponibile." }}</p>
