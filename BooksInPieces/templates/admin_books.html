@@ -47,10 +47,17 @@
                         <input type="number" step="0.1" min="0" name="estimated_reading_hours" class="form-control" placeholder="es. 4.5">
                     </div>
                     <div class="col-sm-6">
-                        <label for="cover_image" class="form-label">Copertina (URL)</label>
+                        <label for="cover_image" class="form-label">Copertina (URL opzionale)</label>
                         <input type="url" name="cover_image" class="form-control" placeholder="https://...">
                     </div>
                 </div>
+
+                <div class="mb-3">
+                    <label for="cover_image_file" class="form-label">Copertina da file locale (opzionale)</label>
+                    <input type="file" name="cover_image_file" accept="image/*" class="form-control">
+                    <div class="form-text">Se carichi un file, verrà salvato direttamente nel database.</div>
+                </div>
+
 
                 <div class="mb-3">
                     <label for="short_description" class="form-label">Descrizione breve</label>
@@ -109,7 +116,7 @@
                         </tr>
                         <tr class="collapse" id="edit-book-{{ book.id }}">
                             <td colspan="3" class="bg-light">
-                                <form action="{{ url_for('app_routes.edit_book', book_id=book.id) }}" method="post" class="row g-3">
+                                <form action="{{ url_for('app_routes.edit_book', book_id=book.id) }}" method="post" enctype="multipart/form-data" class="row g-3">
                                     <div class="col-md-6">
                                         <label class="form-label">Titolo</label>
                                         <input type="text" name="title" class="form-control" value="{{ book.title }}" required>
@@ -139,8 +146,13 @@
                                         <input type="text" name="tags" class="form-control" value="{{ book.tags or '' }}">
                                     </div>
                                     <div class="col-md-6">
-                                        <label class="form-label">Copertina (URL)</label>
+                                        <label class="form-label">Copertina (URL opzionale)</label>
                                         <input type="url" name="cover_image" class="form-control" value="{{ book.cover_image or '' }}">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Nuova copertina da file (opzionale)</label>
+                                        <input type="file" name="cover_image_file" accept="image/*" class="form-control">
+                                        <div class="form-text">{{ "Copertina salvata nel database" if book.cover_image_data else "Nessuna copertina locale" }}</div>
                                     </div>
                                     <div class="col-12">
                                         <label class="form-label">Descrizione breve</label>
