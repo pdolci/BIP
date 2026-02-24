@@ -1010,6 +1010,54 @@ def admin_reset_schedule_progress(schedule_id):
     flash("Progresso della schedulazione azzerato.")
     return redirect(url_for("app_routes.admin_maintenance"))
 
+
+@app_routes.route("/admin/user/reset-password/<int:user_id>", methods=["POST"])
+def admin_reset_user_password(user_id):
+    if "user_id" not in session or not session.get("is_admin"):
+        flash("Accesso negato!")
+        return redirect(url_for("app_routes.index"))
+
+    user = User.query.get(user_id)
+    if not user:
+        flash("Utente non trovato.")
+        return redirect(url_for("app_routes.admin_maintenance"))
+
+    new_password = (request.form.get("new_password") or "").strip()
+    if not new_password:
+        flash("Inserisci una nuova password valida.")
+        return redirect(url_for("app_routes.admin_maintenance"))
+
+    user.set_password(new_password)
+    db.session.commit()
+    flash(f"Password aggiornata per {user.email}.")
+    return redirect(url_for("app_routes.admin_maintenance"))
+
+
+@app_routes.route("/admin/user/delete/<int:user_id>", methods=["POST"])
+def admin_delete_user(user_id):
+    if "user_id" not in session or not session.get("is_admin"):
+        flash("Accesso negato!")
+        return redirect(url_for("app_routes.index"))
+
+    if session.get("user_id") == user_id:
+        flash("Non puoi cancellare il tuo account amministratore da questa schermata.")
+        return redirect(url_for("app_routes.admin_maintenance"))
+
+    user = User.query.get(user_id)
+    if not user:
+        flash("Utente non trovato.")
+        return redirect(url_for("app_routes.admin_maintenance"))
+
+    schedules = ReadingSchedule.query.filter_by(user_id=user.id).all()
+    for schedule in schedules:
+        DeliveryEvent.query.filter_by(schedule_id=schedule.id).delete(synchronize_session=False)
+        db.session.delete(schedule)
+
+    db.session.delete(user)
+    db.session.commit()
+    flash(f"Utente {user.email} eliminato con successo.")
+    return redirect(url_for("app_routes.admin_maintenance"))
+
 @app_routes.route("/upload_book", methods=["POST"])
 def upload_book():
     if "user_id" not in session or not session.get("is_admin"):

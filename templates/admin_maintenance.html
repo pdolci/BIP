@@ -79,6 +79,13 @@
                                         </td>
                                         <td class="text-end">
                                             <div class="d-flex flex-wrap justify-content-end gap-2">
+                                                <form action="{{ url_for('app_routes.admin_reset_user_password', user_id=user.id) }}" method="post" class="d-flex gap-1">
+                                                    <input type="password" name="new_password" class="form-control form-control-sm" placeholder="Nuova password" minlength="8" required>
+                                                    <button class="btn btn-sm btn-outline-dark" type="submit">Reset password</button>
+                                                </form>
+                                                <form action="{{ url_for('app_routes.admin_delete_user', user_id=user.id) }}" method="post" onsubmit="return confirm('Confermi la cancellazione definitiva di {{ user.email }}?');">
+                                                    <button class="btn btn-sm btn-danger" type="submit">Elimina utente</button>
+                                                </form>
                                                 <form action="{{ url_for('app_routes.admin_toggle_pause_schedule', schedule_id=schedule.id) }}" method="post">
                                                     <button class="btn btn-sm btn-outline-warning" type="submit">{{ 'Riprendi' if schedule.is_paused else 'Pausa' }}</button>
                                                 </form>
@@ -102,7 +109,19 @@
                                         <div>Canale preferito: <strong>{{ user.preferred_delivery_channel|upper }}</strong></div>
                                         <div>Telegram: {{ user.telegram_handle or 'n/d' }}</div>
                                     </td>
-                                    <td colspan="3" class="text-muted">Nessun libro schedulato.</td>
+                                    <td class="text-muted">Nessun libro schedulato.</td>
+                                    <td></td>
+                                    <td class="text-end">
+                                        <div class="d-flex flex-wrap justify-content-end gap-2">
+                                            <form action="{{ url_for('app_routes.admin_reset_user_password', user_id=user.id) }}" method="post" class="d-flex gap-1">
+                                                <input type="password" name="new_password" class="form-control form-control-sm" placeholder="Nuova password" minlength="8" required>
+                                                <button class="btn btn-sm btn-outline-dark" type="submit">Reset password</button>
+                                            </form>
+                                            <form action="{{ url_for('app_routes.admin_delete_user', user_id=user.id) }}" method="post" onsubmit="return confirm('Confermi la cancellazione definitiva di {{ user.email }}?');">
+                                                <button class="btn btn-sm btn-danger" type="submit">Elimina utente</button>
+                                            </form>
+                                        </div>
+                                    </td>
                                 </tr>
                             {% endif %}
                         {% endfor %}
