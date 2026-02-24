@@ -45,6 +45,30 @@ MAX_ACTIVE_SUBSCRIPTIONS = 3
 ORIGIN_QUOTES_FILE = os.path.join(os.path.dirname(__file__), "Origin.txt")
 
 EMAIL_REGEX = re.compile(r"^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$", re.IGNORECASE)
+SESSION_LAST_ACTIVITY_KEY = "last_activity_ts"
+
+
+@app_routes.before_app_request
+def enforce_session_inactivity_timeout():
+    user_id = session.get("user_id")
+    if not user_id:
+        return None
+
+    endpoint = request.endpoint or ""
+    if endpoint in {"app_routes.login", "app_routes.logout", "static"}:
+        return None
+
+    timeout_seconds = max(Config.SESSION_INACTIVITY_MINUTES, 1) * 60
+    now_ts = int(datetime.datetime.utcnow().timestamp())
+    last_activity_ts = session.get(SESSION_LAST_ACTIVITY_KEY)
+
+    if isinstance(last_activity_ts, int) and now_ts - last_activity_ts > timeout_seconds:
+        session.clear()
+        flash("Sessione scaduta per inattività. Effettua nuovamente il login.")
+        return redirect(url_for("app_routes.login"))
+
+    session[SESSION_LAST_ACTIVITY_KEY] = now_ts
+    return None
 
 
 def _is_valid_email(value):
@@ -365,6 +389,8 @@ def login():
                 return redirect(url_for("app_routes.login"))
             session["user_id"] = user.id
             session["is_admin"] = user.is_admin
+            session.permanent = True
+            session[SESSION_LAST_ACTIVITY_KEY] = int(datetime.datetime.utcnow().timestamp())
             flash("Login riuscito!")
             return redirect(url_for("app_routes.index"))
         else:
@@ -444,6 +470,7 @@ def reset_password(token):
 def logout():
     session.pop("user_id", None)
     session.pop("is_admin", None)
+    session.pop(SESSION_LAST_ACTIVITY_KEY, None)
     flash("Logout effettuato!")
     return redirect(url_for("app_routes.index"))
 

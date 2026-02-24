@@ -1,4 +1,5 @@
 import os
+from datetime import timedelta
 
 
 def _load_dotenv_if_present() -> None:
@@ -85,6 +86,8 @@ class Config:
     SESSION_COOKIE_SECURE = _get_bool_env("SESSION_COOKIE_SECURE", True)
     SESSION_COOKIE_HTTPONLY = _get_bool_env("SESSION_COOKIE_HTTPONLY", True)
     SESSION_COOKIE_SAMESITE = os.environ.get("SESSION_COOKIE_SAMESITE", "Lax")
+    SESSION_INACTIVITY_MINUTES = _get_int_env("SESSION_INACTIVITY_MINUTES", 10)
+    PERMANENT_SESSION_LIFETIME = timedelta(minutes=SESSION_INACTIVITY_MINUTES)
     PREFERRED_URL_SCHEME = os.environ.get("PREFERRED_URL_SCHEME", "https")
 
     USE_PROXY_FIX = _get_bool_env("USE_PROXY_FIX", True)
