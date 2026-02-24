@@ -16,6 +16,7 @@ from email_sender import (
     SUPPORTED_DELIVERY_CHANNELS,
     send_next_book_part,
     send_password_reset_email,
+    send_email_confirmation_request,
     count_total_words,
 )
 from config import Config
@@ -42,6 +43,17 @@ app_routes = Blueprint("app_routes", __name__)
 WEEKDAY_CHOICES = {"0", "1", "2", "3", "4", "5", "6"}
 MAX_ACTIVE_SUBSCRIPTIONS = 3
 ORIGIN_QUOTES_FILE = os.path.join(os.path.dirname(__file__), "Origin.txt")
+
+EMAIL_REGEX = re.compile(r"^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$", re.IGNORECASE)
+
+
+def _is_valid_email(value):
+    return bool(EMAIL_REGEX.fullmatch((value or "").strip()))
+
+
+def get_email_token_serializer():
+    return URLSafeTimedSerializer(Config.SECRET_KEY)
+
 
 
 def _get_random_origin_quote():
@@ -307,26 +319,50 @@ def index():
 @app_routes.route("/register", methods=["GET", "POST"])
 def register():
     if request.method == "POST":
-        email = request.form["email"]
-        password = request.form["password"]
+        email = (request.form.get("email") or "").strip().lower()
+        password = request.form.get("password") or ""
         telegram_handle = (request.form.get("telegram_handle") or "").strip()
+
+        if not _is_valid_email(email):
+            flash("Inserisci un indirizzo email valido.")
+            return redirect(url_for("app_routes.register"))
+
         user = User.query.filter_by(email=email).first()
-        if not user:
-            user = User(email=email, telegram_handle=telegram_handle or None)
-            user.set_password(password)
-            db.session.add(user)
-            db.session.commit()
-            flash("Registrazione completata!")
-        return redirect(url_for("app_routes.index"))
+        if user:
+            if not user.email_confirmed:
+                serializer = get_email_token_serializer()
+                token = serializer.dumps(user.email, salt="email-confirm")
+                confirmation_url = url_for("app_routes.confirm_email", token=token, _external=True)
+                send_email_confirmation_request(user.email, confirmation_url)
+                flash("Questa email è già registrata ma non confermata: ti abbiamo inviato un nuovo link di conferma.")
+            else:
+                flash("Esiste già un account con questa email. Prova ad accedere.")
+            return redirect(url_for("app_routes.login"))
+
+        user = User(email=email, telegram_handle=telegram_handle or None, email_confirmed=False)
+        user.set_password(password)
+        db.session.add(user)
+        db.session.commit()
+
+        serializer = get_email_token_serializer()
+        token = serializer.dumps(user.email, salt="email-confirm")
+        confirmation_url = url_for("app_routes.confirm_email", token=token, _external=True)
+        send_email_confirmation_request(user.email, confirmation_url)
+
+        flash("Registrazione completata! Ti abbiamo inviato una mail per confermare l'indirizzo.")
+        return redirect(url_for("app_routes.login"))
     return render_template("register.html")
 
 @app_routes.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
-        email = request.form["email"]
-        password = request.form["password"]
+        email = (request.form.get("email") or "").strip().lower()
+        password = request.form.get("password") or ""
         user = User.query.filter_by(email=email).first()
         if user and user.check_password(password):
+            if not user.email_confirmed:
+                flash("Conferma prima il tuo indirizzo email tramite il link ricevuto.")
+                return redirect(url_for("app_routes.login"))
             session["user_id"] = user.id
             session["is_admin"] = user.is_admin
             flash("Login riuscito!")
@@ -334,6 +370,28 @@ def login():
         else:
             flash("Credenziali non valide!")
     return render_template("login.html")
+
+@app_routes.route("/confirm_email/<token>")
+def confirm_email(token):
+    serializer = get_email_token_serializer()
+
+    try:
+        email = serializer.loads(token, salt="email-confirm", max_age=60 * 60 * 24)
+    except (SignatureExpired, BadSignature):
+        flash("Link di conferma non valido o scaduto.")
+        return redirect(url_for("app_routes.login"))
+
+    user = User.query.filter_by(email=email).first()
+    if not user:
+        flash("Utente non trovato.")
+        return redirect(url_for("app_routes.register"))
+
+    if not user.email_confirmed:
+        user.email_confirmed = True
+        db.session.commit()
+
+    flash("Email confermata con successo! Ora puoi accedere.")
+    return redirect(url_for("app_routes.login"))
 
 @app_routes.route("/forgot_password", methods=["GET", "POST"])
 def forgot_password():
@@ -412,6 +470,10 @@ def profile():
             flash("L'email è obbligatoria.")
             return redirect(url_for("app_routes.profile"))
 
+        if not _is_valid_email(email):
+            flash("Inserisci un indirizzo email valido.")
+            return redirect(url_for("app_routes.profile"))
+
         existing_user = User.query.filter(User.email == email, User.id != user.id).first()
         if existing_user:
             flash("Questa email è già in uso da un altro account.")
@@ -449,6 +511,36 @@ def profile():
         delivery_email=DELIVERY_EMAIL,
         delivery_telegram=DELIVERY_TELEGRAM,
     )
+
+
+@app_routes.route("/profile/delete_account", methods=["POST"])
+def delete_account():
+    if "user_id" not in session:
+        flash("Devi effettuare il login.")
+        return redirect(url_for("app_routes.login"))
+
+    confirmation = (request.form.get("delete_confirmation") or "").strip().upper()
+    if confirmation != "ELIMINA":
+        flash("Per cancellare l'account digita ELIMINA nel campo di conferma.")
+        return redirect(url_for("app_routes.profile"))
+
+    user = User.query.get(session["user_id"])
+    if not user:
+        flash("Utente non trovato.")
+        return redirect(url_for("app_routes.logout"))
+
+    schedules = ReadingSchedule.query.filter_by(user_id=user.id).all()
+    for schedule in schedules:
+        DeliveryEvent.query.filter_by(schedule_id=schedule.id).delete(synchronize_session=False)
+        db.session.delete(schedule)
+
+    db.session.delete(user)
+    db.session.commit()
+
+    session.pop("user_id", None)
+    session.pop("is_admin", None)
+    flash("Il tuo account è stato disiscritto e cancellato completamente.")
+    return redirect(url_for("app_routes.index"))
 
 @app_routes.route("/select_book", methods=["GET", "POST"])
 def select_book():
