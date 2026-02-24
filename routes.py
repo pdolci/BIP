@@ -8,6 +8,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, sessio
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 from werkzeug.utils import secure_filename
 import uuid
+import chardet
 from extensions import db
 from models import User, Book, ReadingSchedule, DeliveryEvent
 from email_sender import (
@@ -32,6 +33,7 @@ from schedule_utils import (
 )
 import logging
 from time_utils import utc_now_naive, local_now_naive, local_naive_to_utc_naive
+from html_processing import sanitize_uploaded_html
 
 UPLOAD_FOLDER = Config.UPLOAD_FOLDER
 COVER_UPLOAD_FOLDER = Config.COVER_UPLOAD_FOLDER
@@ -115,6 +117,22 @@ def _extract_cover_file_extension(file_storage):
         return None
 
     return extension
+
+
+def _sanitize_uploaded_book_file(file_path, extension):
+    if extension not in {"html", "htm"}:
+        return
+
+    with open(file_path, "rb") as source:
+        raw_content = source.read()
+
+    detected = chardet.detect(raw_content)
+    encoding = detected.get("encoding") or "utf-8"
+    decoded = raw_content.decode(encoding, errors="replace")
+    sanitized = sanitize_uploaded_html(decoded)
+
+    with open(file_path, "w", encoding="utf-8", errors="replace") as target:
+        target.write(sanitized)
 
 
 def ensure_cover_uploads_folder():
@@ -1119,9 +1137,11 @@ def upload_book():
         
         try:
             file.save(file_path)  # ✅ Save the file
+            extension = filename.rsplit(".", 1)[1].lower() if "." in filename else ""
+            _sanitize_uploaded_book_file(file_path, extension)
             logging.info(f"✅ Libro salvato: {file_path}")
         except Exception as e:
-            logging.error(f"❌ Errore durante il salvataggio del file: {e}")
+            logging.error(f"❌ Errore durante il salvataggio/sanitizzazione del file: {e}")
             flash("Errore nel salvataggio del file!")
             return redirect(request.url)
 

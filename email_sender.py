@@ -8,6 +8,7 @@ import urllib.request
 from dataclasses import dataclass
 
 import chardet
+from html_processing import sanitize_uploaded_html
 from flask_mail import Message
 from sqlalchemy.orm import joinedload
 
@@ -155,20 +156,15 @@ def sanitize_source_text(content):
 
 
 def normalize_html_for_chunking(content):
-    """Rimuove sezioni non narrative HTML per rendere stabile il chunking a parole."""
+    """Sanitizza HTML e preserva la struttura narrativa per chunking stabile."""
     normalized = sanitize_source_text(content)
-    normalized = re.sub(r"<!--.*?-->", "", normalized, flags=re.DOTALL)
-    normalized = re.sub(r"<script.*?>.*?</script>", "", normalized, flags=re.IGNORECASE | re.DOTALL)
-    normalized = re.sub(r"<style.*?>.*?</style>", "", normalized, flags=re.IGNORECASE | re.DOTALL)
-    normalized = re.sub(r"<noscript.*?>.*?</noscript>", "", normalized, flags=re.IGNORECASE | re.DOTALL)
-    normalized = re.sub(r"<template.*?>.*?</template>", "", normalized, flags=re.IGNORECASE | re.DOTALL)
+    cleaned = sanitize_uploaded_html(normalized)
 
-    body_match = re.search(r"<body\b[^>]*>(.*?)</body>", normalized, flags=re.IGNORECASE | re.DOTALL)
+    body_match = re.search(r"<body\b[^>]*>(.*?)</body>", cleaned, flags=re.IGNORECASE | re.DOTALL)
     if body_match:
         return body_match.group(1)
 
-    # fallback: rimuove almeno la sezione <head> se non troviamo <body>
-    return re.sub(r"<head.*?>.*?</head>", "", normalized, flags=re.IGNORECASE | re.DOTALL)
+    return cleaned
 
 
 def html_to_text(content):
@@ -186,8 +182,7 @@ def build_email_bodies(chunk, is_html_source=False):
 
     if is_html_source:
         raw_html = chunk.html_content if isinstance(chunk, ContentChunk) else str(chunk)
-        cleaned_html = re.sub(r"<script.*?>.*?</script>", "", raw_html, flags=re.IGNORECASE | re.DOTALL)
-        html_body = cleaned_html
+        html_body = sanitize_uploaded_html(raw_html)
     else:
         escaped_text = html.escape(plain_text).replace("\n", "<br>")
         html_body = (
