@@ -29,6 +29,7 @@ Variabili opzionali principali:
 - `SESSION_COOKIE_SECURE` (default: `true`)
 - `SESSION_COOKIE_HTTPONLY` (default: `true`)
 - `SESSION_COOKIE_SAMESITE` (default: `Lax`)
+- `SESSION_INACTIVITY_MINUTES` (default: `10`)
 - `PREFERRED_URL_SCHEME` (default: `https`)
 - `USE_PROXY_FIX` (default: `true`)
 - `PROXY_FIX_X_FOR` (default: `1`)
