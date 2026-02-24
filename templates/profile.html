@@ -44,6 +44,20 @@
                         </button>
                     </div>
                 </form>
+
+                <hr class="my-4">
+                <div class="border border-danger-subtle rounded-3 p-3 bg-danger-subtle">
+                    <h2 class="h6 text-danger mb-2"><i class="bi bi-exclamation-triangle me-1"></i>Disiscrizione completa</h2>
+                    <p class="small mb-3">Questa operazione elimina definitivamente account, sottoscrizioni e storico invii dal database.</p>
+                    <form method="POST" action="{{ url_for('app_routes.delete_account') }}" class="row g-2">
+                        <div class="col-md-8">
+                            <input class="form-control" type="text" name="delete_confirmation" placeholder="Digita ELIMINA per confermare" required>
+                        </div>
+                        <div class="col-md-4 d-grid">
+                            <button class="btn btn-danger" type="submit"><i class="bi bi-trash me-1"></i>Elimina account</button>
+                        </div>
+                    </form>
+                </div>
             </div>
         </div>
     </div>

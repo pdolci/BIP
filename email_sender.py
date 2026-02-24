@@ -46,6 +46,25 @@ def send_email(to, subject, body, html_body=None):
         return False
 
 
+def send_email_confirmation_request(to, confirmation_url):
+    subject = "Conferma il tuo indirizzo email"
+    body = (
+        "Ciao!\n\n"
+        "Grazie per esserti registrato. Per attivare l'account, conferma il tuo indirizzo email visitando questo link:\n"
+        f"{confirmation_url}\n\n"
+        "Se non hai richiesto tu la registrazione, puoi ignorare questa email."
+    )
+    html_body = (
+        "<div style='font-family: Arial, sans-serif; line-height: 1.6;'>"
+        "<p>Ciao!</p>"
+        "<p>Grazie per esserti registrato. Per attivare l'account, conferma il tuo indirizzo email cliccando qui:</p>"
+        f"<p><a href='{html.escape(confirmation_url, quote=True)}'>Conferma indirizzo email</a></p>"
+        "<p>Se non hai richiesto tu la registrazione, puoi ignorare questa email.</p>"
+        "</div>"
+    )
+    return send_email(to, subject, body, html_body)
+
+
 def send_telegram_message(chat_id, message):
     token = Config.TELEGRAM_BOT_TOKEN
     if not token:
