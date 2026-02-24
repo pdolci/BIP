@@ -821,6 +821,103 @@ def manage_books():
     books = Book.query.order_by(Book.title.asc()).all()
     return render_template("admin_books.html", books=books)
 
+
+@app_routes.route("/admin/maintenance")
+def admin_maintenance():
+    if "user_id" not in session or not session.get("is_admin"):
+        flash("Accesso negato!")
+        return redirect(url_for("app_routes.index"))
+
+    users = User.query.options(
+        joinedload(User.schedules).joinedload(ReadingSchedule.book)
+    ).order_by(User.created_at.desc()).all()
+
+    all_schedules = [schedule for user in users for schedule in user.schedules]
+    now = utc_now_naive()
+    due_schedules = [
+        schedule for schedule in all_schedules
+        if not schedule.is_paused and schedule.next_send_date and schedule.next_send_date <= now
+    ]
+    paused_schedules = [schedule for schedule in all_schedules if schedule.is_paused]
+
+    return render_template(
+        "admin_maintenance.html",
+        users=users,
+        now=now,
+        total_users=len(users),
+        total_schedules=len(all_schedules),
+        active_schedules=len(all_schedules) - len(paused_schedules),
+        paused_schedules=len(paused_schedules),
+        due_schedules=len(due_schedules),
+        describe_frequency=describe_frequency,
+        describe_delivery_channel=describe_delivery_channel,
+    )
+
+
+@app_routes.route("/admin/schedule/toggle-pause/<int:schedule_id>", methods=["POST"])
+def admin_toggle_pause_schedule(schedule_id):
+    if "user_id" not in session or not session.get("is_admin"):
+        flash("Accesso negato!")
+        return redirect(url_for("app_routes.index"))
+
+    schedule = ReadingSchedule.query.get(schedule_id)
+    if not schedule:
+        flash("Schedulazione non trovata.")
+        return redirect(url_for("app_routes.admin_maintenance"))
+
+    schedule.is_paused = not schedule.is_paused
+    db.session.commit()
+    flash("Schedulazione messa in pausa." if schedule.is_paused else "Schedulazione riattivata.")
+    return redirect(url_for("app_routes.admin_maintenance"))
+
+
+@app_routes.route("/admin/schedule/recompute/<int:schedule_id>", methods=["POST"])
+def admin_recompute_schedule(schedule_id):
+    if "user_id" not in session or not session.get("is_admin"):
+        flash("Accesso negato!")
+        return redirect(url_for("app_routes.index"))
+
+    schedule = ReadingSchedule.query.get(schedule_id)
+    if not schedule:
+        flash("Schedulazione non trovata.")
+        return redirect(url_for("app_routes.admin_maintenance"))
+
+    next_local_date = compute_next_send_datetime(
+        local_now_naive(),
+        schedule,
+        allow_immediate=False,
+    )
+    schedule.next_send_date = local_naive_to_utc_naive(next_local_date)
+    db.session.commit()
+    flash("Prossimo invio ricalcolato con successo.")
+    return redirect(url_for("app_routes.admin_maintenance"))
+
+
+@app_routes.route("/admin/schedule/reset-progress/<int:schedule_id>", methods=["POST"])
+def admin_reset_schedule_progress(schedule_id):
+    if "user_id" not in session or not session.get("is_admin"):
+        flash("Accesso negato!")
+        return redirect(url_for("app_routes.index"))
+
+    schedule = ReadingSchedule.query.get(schedule_id)
+    if not schedule:
+        flash("Schedulazione non trovata.")
+        return redirect(url_for("app_routes.admin_maintenance"))
+
+    schedule.last_sent_index = 0
+    schedule.skip_next = False
+    schedule.snooze_until = None
+    schedule.travel_pause_until = None
+    db.session.add(DeliveryEvent(
+        schedule_id=schedule.id,
+        event_type="skipped",
+        words_count=0,
+        note="Reset progresso eseguito da admin",
+    ))
+    db.session.commit()
+    flash("Progresso della schedulazione azzerato.")
+    return redirect(url_for("app_routes.admin_maintenance"))
+
 @app_routes.route("/upload_book", methods=["POST"])
 def upload_book():
     if "user_id" not in session or not session.get("is_admin"):
