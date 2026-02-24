@@ -4,10 +4,15 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from config import Config
 
 class User(db.Model):
+    ROLE_USER = "user"
+    ROLE_CONTENT_MANAGER = "content_manager"
+    ROLE_ADMIN = "admin"
+
     id = db.Column(db.Integer, primary_key=True)
     email = db.Column(db.String(120), unique=True, nullable=False)
     password_hash = db.Column(db.String(255), nullable=False)
     is_admin = db.Column(db.Boolean, default=False)
+    role = db.Column(db.String(30), nullable=False, default=ROLE_USER)
     created_at = db.Column(db.DateTime, default=db.func.current_timestamp())
     telegram_handle = db.Column(db.String(120), nullable=True)
     preferred_delivery_channel = db.Column(db.String(20), nullable=False, default="email")
@@ -18,6 +23,18 @@ class User(db.Model):
 
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
+
+    @property
+    def resolved_role(self):
+        if self.role in {self.ROLE_USER, self.ROLE_CONTENT_MANAGER, self.ROLE_ADMIN}:
+            return self.role
+        return self.ROLE_ADMIN if self.is_admin else self.ROLE_USER
+
+    def can_manage_books(self):
+        return self.resolved_role in {self.ROLE_CONTENT_MANAGER, self.ROLE_ADMIN}
+
+    def can_manage_admin_panel(self):
+        return self.resolved_role == self.ROLE_ADMIN
 
 class Book(db.Model):
     __table_args__ = (
