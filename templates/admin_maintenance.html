@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row g-4">
+    <div class="col-12">
+        <h1 class="section-title"><i class="bi bi-speedometer2 me-2"></i>Console amministrativa</h1>
+        <p class="text-muted mb-0">Panoramica utenti, libri scelti e strumenti rapidi di manutenzione delle schedulazioni.</p>
+    </div>
+
+    <div class="col-md-6 col-xl-3">
+        <div class="card panel-card p-3 h-100">
+            <div class="small text-uppercase text-muted">Utenti</div>
+            <div class="display-6 fw-bold">{{ total_users }}</div>
+        </div>
+    </div>
+    <div class="col-md-6 col-xl-3">
+        <div class="card panel-card p-3 h-100">
+            <div class="small text-uppercase text-muted">Schedulazioni totali</div>
+            <div class="display-6 fw-bold">{{ total_schedules }}</div>
+        </div>
+    </div>
+    <div class="col-md-6 col-xl-3">
+        <div class="card panel-card p-3 h-100">
+            <div class="small text-uppercase text-muted">Schedulazioni attive</div>
+            <div class="display-6 fw-bold text-success">{{ active_schedules }}</div>
+        </div>
+    </div>
+    <div class="col-md-6 col-xl-3">
+        <div class="card panel-card p-3 h-100">
+            <div class="small text-uppercase text-muted">Invii in ritardo</div>
+            <div class="display-6 fw-bold {{ 'text-danger' if due_schedules else '' }}">{{ due_schedules }}</div>
+        </div>
+    </div>
+
+    <div class="col-12">
+        <div class="card panel-card p-4">
+            <h3 class="mb-3">Utenti e libri scelti</h3>
+            <div class="table-responsive">
+                <table class="table align-middle table-hover">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Utente</th>
+                            <th>Contatti</th>
+                            <th>Libro / Pianificazione</th>
+                            <th>Stato</th>
+                            <th class="text-end">Manutenzione</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for user in users %}
+                            {% if user.schedules %}
+                                {% for schedule in user.schedules %}
+                                    <tr>
+                                        <td>
+                                            <strong>{{ user.email }}</strong>
+                                            <div class="small text-muted">ID utente: {{ user.id }}</div>
+                                        </td>
+                                        <td class="small">
+                                            <div>Canale preferito: <strong>{{ user.preferred_delivery_channel|upper }}</strong></div>
+                                            <div>Telegram: {{ user.telegram_handle or 'n/d' }}</div>
+                                        </td>
+                                        <td>
+                                            <strong>{{ schedule.book.title if schedule.book else 'Libro non disponibile' }}</strong>
+                                            <div class="small text-muted">
+                                                {{ describe_frequency(schedule) }} · {{ describe_delivery_channel(schedule) }}
+                                            </div>
+                                            <div class="small text-muted">
+                                                Ultimo indice inviato: {{ schedule.last_sent_index }} · Prossimo invio: {{ schedule.next_send_date.strftime('%d/%m/%Y %H:%M') if schedule.next_send_date else 'n/d' }}
+                                            </div>
+                                        </td>
+                                        <td>
+                                            {% if schedule.is_paused %}
+                                                <span class="badge bg-secondary">In pausa</span>
+                                            {% elif schedule.next_send_date and schedule.next_send_date <= now %}
+                                                <span class="badge bg-danger">Da inviare</span>
+                                            {% else %}
+                                                <span class="badge bg-success">Attiva</span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="text-end">
+                                            <div class="d-flex flex-wrap justify-content-end gap-2">
+                                                <form action="{{ url_for('app_routes.admin_toggle_pause_schedule', schedule_id=schedule.id) }}" method="post">
+                                                    <button class="btn btn-sm btn-outline-warning" type="submit">{{ 'Riprendi' if schedule.is_paused else 'Pausa' }}</button>
+                                                </form>
+                                                <form action="{{ url_for('app_routes.admin_recompute_schedule', schedule_id=schedule.id) }}" method="post">
+                                                    <button class="btn btn-sm btn-outline-primary" type="submit">Ricalcola invio</button>
+                                                </form>
+                                                <form action="{{ url_for('app_routes.admin_reset_schedule_progress', schedule_id=schedule.id) }}" method="post">
+                                                    <button class="btn btn-sm btn-outline-danger" type="submit">Reset progresso</button>
+                                                </form>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            {% else %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ user.email }}</strong>
+                                        <div class="small text-muted">ID utente: {{ user.id }}</div>
+                                    </td>
+                                    <td class="small">
+                                        <div>Canale preferito: <strong>{{ user.preferred_delivery_channel|upper }}</strong></div>
+                                        <div>Telegram: {{ user.telegram_handle or 'n/d' }}</div>
+                                    </td>
+                                    <td colspan="3" class="text-muted">Nessun libro schedulato.</td>
+                                </tr>
+                            {% endif %}
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
