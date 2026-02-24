@@ -77,6 +77,18 @@ def _is_valid_email(value):
     return bool(EMAIL_REGEX.fullmatch((value or "").strip()))
 
 
+def is_logged_in():
+    return "user_id" in session
+
+
+def has_admin_access():
+    return bool(session.get("is_admin"))
+
+
+def has_book_management_access():
+    return bool(session.get("is_admin") or session.get("is_content_manager"))
+
+
 def get_email_token_serializer():
     return URLSafeTimedSerializer(Config.SECRET_KEY)
 
@@ -407,6 +419,7 @@ def login():
                 return redirect(url_for("app_routes.login"))
             session["user_id"] = user.id
             session["is_admin"] = user.is_admin
+            session["is_content_manager"] = user.is_content_manager
             session.permanent = True
             session[SESSION_LAST_ACTIVITY_KEY] = int(datetime.datetime.utcnow().timestamp())
             flash("Login riuscito!")
@@ -488,6 +501,7 @@ def reset_password(token):
 def logout():
     session.pop("user_id", None)
     session.pop("is_admin", None)
+    session.pop("is_content_manager", None)
     session.pop(SESSION_LAST_ACTIVITY_KEY, None)
     flash("Logout effettuato!")
     return redirect(url_for("app_routes.index"))
@@ -584,6 +598,7 @@ def delete_account():
 
     session.pop("user_id", None)
     session.pop("is_admin", None)
+    session.pop("is_content_manager", None)
     flash("Il tuo account è stato disiscritto e cancellato completamente.")
     return redirect(url_for("app_routes.index"))
 
@@ -951,7 +966,7 @@ def delete_schedule(schedule_id):
 
 @app_routes.route("/manage_books")
 def manage_books():
-    if "user_id" not in session or not session.get("is_admin"):
+    if not is_logged_in() or not has_book_management_access():
         flash("Accesso negato!")
         return redirect(url_for("app_routes.index"))
 
@@ -961,7 +976,7 @@ def manage_books():
 
 @app_routes.route("/admin/maintenance")
 def admin_maintenance():
-    if "user_id" not in session or not session.get("is_admin"):
+    if not is_logged_in() or not has_admin_access():
         flash("Accesso negato!")
         return redirect(url_for("app_routes.index"))
 
@@ -993,7 +1008,7 @@ def admin_maintenance():
 
 @app_routes.route("/admin/schedule/toggle-pause/<int:schedule_id>", methods=["POST"])
 def admin_toggle_pause_schedule(schedule_id):
-    if "user_id" not in session or not session.get("is_admin"):
+    if not is_logged_in() or not has_admin_access():
         flash("Accesso negato!")
         return redirect(url_for("app_routes.index"))
 
@@ -1010,7 +1025,7 @@ def admin_toggle_pause_schedule(schedule_id):
 
 @app_routes.route("/admin/schedule/recompute/<int:schedule_id>", methods=["POST"])
 def admin_recompute_schedule(schedule_id):
-    if "user_id" not in session or not session.get("is_admin"):
+    if not is_logged_in() or not has_admin_access():
         flash("Accesso negato!")
         return redirect(url_for("app_routes.index"))
 
@@ -1032,7 +1047,7 @@ def admin_recompute_schedule(schedule_id):
 
 @app_routes.route("/admin/schedule/reset-progress/<int:schedule_id>", methods=["POST"])
 def admin_reset_schedule_progress(schedule_id):
-    if "user_id" not in session or not session.get("is_admin"):
+    if not is_logged_in() or not has_admin_access():
         flash("Accesso negato!")
         return redirect(url_for("app_routes.index"))
 
@@ -1058,7 +1073,7 @@ def admin_reset_schedule_progress(schedule_id):
 
 @app_routes.route("/admin/user/reset-password/<int:user_id>", methods=["POST"])
 def admin_reset_user_password(user_id):
-    if "user_id" not in session or not session.get("is_admin"):
+    if not is_logged_in() or not has_admin_access():
         flash("Accesso negato!")
         return redirect(url_for("app_routes.index"))
 
@@ -1080,7 +1095,7 @@ def admin_reset_user_password(user_id):
 
 @app_routes.route("/admin/user/delete/<int:user_id>", methods=["POST"])
 def admin_delete_user(user_id):
-    if "user_id" not in session or not session.get("is_admin"):
+    if not is_logged_in() or not has_admin_access():
         flash("Accesso negato!")
         return redirect(url_for("app_routes.index"))
 
@@ -1105,7 +1120,7 @@ def admin_delete_user(user_id):
 
 @app_routes.route("/upload_book", methods=["POST"])
 def upload_book():
-    if "user_id" not in session or not session.get("is_admin"):
+    if not is_logged_in() or not has_book_management_access():
         flash("Accesso negato!")
         return redirect(url_for("app_routes.index"))
 
@@ -1184,7 +1199,7 @@ def upload_book():
 
 @app_routes.route("/admin/book/edit/<int:book_id>", methods=["POST"])
 def edit_book(book_id):
-    if "user_id" not in session or not session.get("is_admin"):
+    if not is_logged_in() or not has_book_management_access():
         flash("Accesso negato!")
         return redirect(url_for("app_routes.index"))
 
@@ -1265,7 +1280,7 @@ def book_cover(book_id):
 
 @app_routes.route("/admin/book/delete/<int:book_id>", methods=["POST"])
 def delete_book(book_id):
-    if "user_id" not in session or not session.get("is_admin"):
+    if not is_logged_in() or not has_book_management_access():
         flash("Accesso negato!")
         return redirect(url_for("app_routes.index"))
 
@@ -1286,7 +1301,7 @@ def delete_book(book_id):
 
 @app_routes.route("/admin/book/toggle/<int:book_id>", methods=["POST"])
 def toggle_book_status(book_id):
-    if "user_id" not in session or not session.get("is_admin"):
+    if not is_logged_in() or not has_book_management_access():
         flash("Accesso negato!")
         return redirect(url_for("app_routes.index"))
 
@@ -1300,7 +1315,7 @@ def toggle_book_status(book_id):
 
 @app_routes.route("/test_email_sending/<int:schedule_id>")
 def test_email_sending(schedule_id):
-    if "user_id" not in session or not session.get("is_admin"):
+    if not is_logged_in() or not has_book_management_access():
         flash("Accesso negato!")
         return redirect(url_for("app_routes.index"))
 
