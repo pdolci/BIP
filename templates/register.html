@@ -15,7 +15,8 @@
             </div>
             <div class="mb-3">
                 <label class="form-label">Password</label>
-                <input type="password" name="password" class="form-control" required>
+                <input type="password" name="password" class="form-control" minlength="8" maxlength="15" pattern="(?=.*[A-Za-z])(?=.*\d)(?=.*[!£$%&^])[A-Za-z\d!£$%&^]{8,15}" title="8-15 caratteri, con almeno una lettera, un numero e un simbolo tra !£$%&^." required>
+                <div class="form-text">8-15 caratteri, con almeno una lettera, un numero e un simbolo tra !£$%&^.</div>
             </div>
             <button type="submit" class="btn btn-primary w-100">Crea account</button>
         </form>
