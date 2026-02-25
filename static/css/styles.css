@@ -27,6 +27,13 @@ body {
     letter-spacing: 0.2px;
 }
 
+.navbar-brand-logo {
+    width: 32px;
+    height: 32px;
+    object-fit: contain;
+    border-radius: 6px;
+}
+
 .nav-link {
     color: rgba(255, 255, 255, 0.95) !important;
     font-weight: 600;
