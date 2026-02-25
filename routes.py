@@ -47,6 +47,7 @@ MAX_ACTIVE_SUBSCRIPTIONS = 3
 ORIGIN_QUOTES_FILE = os.path.join(os.path.dirname(__file__), "Origin.txt")
 
 EMAIL_REGEX = re.compile(r"^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$", re.IGNORECASE)
+PASSWORD_ALLOWED_SYMBOLS = "!£$%&^"
 SESSION_LAST_ACTIVITY_KEY = "last_activity_ts"
 
 
@@ -75,6 +76,30 @@ def enforce_session_inactivity_timeout():
 
 def _is_valid_email(value):
     return bool(EMAIL_REGEX.fullmatch((value or "").strip()))
+
+
+def _validate_password_requirements(password):
+    password = password or ""
+    if not 8 <= len(password) <= 15:
+        return False
+
+    if not re.search(r"[A-Za-z]", password):
+        return False
+
+    if not re.search(r"\d", password):
+        return False
+
+    if not re.search(rf"[{re.escape(PASSWORD_ALLOWED_SYMBOLS)}]", password):
+        return False
+
+    return bool(re.fullmatch(rf"[A-Za-z\d{re.escape(PASSWORD_ALLOWED_SYMBOLS)}]+", password))
+
+
+def _password_requirements_message():
+    return (
+        "La password deve essere lunga tra 8 e 15 caratteri e contenere almeno "
+        "una lettera, un numero e un simbolo tra !£$%&^."
+    )
 
 
 def is_logged_in():
@@ -393,6 +418,10 @@ def register():
                 flash("Esiste già un account con questa email. Prova ad accedere.")
             return redirect(url_for("app_routes.login"))
 
+        if not _validate_password_requirements(password):
+            flash(_password_requirements_message())
+            return redirect(url_for("app_routes.register"))
+
         user = User(email=email, telegram_handle=telegram_handle or None, email_confirmed=False)
         user.set_password(password)
         db.session.add(user)
@@ -490,6 +519,10 @@ def reset_password(token):
             flash("Le password non coincidono.")
             return redirect(url_for("app_routes.reset_password", token=token))
 
+        if not _validate_password_requirements(password):
+            flash(_password_requirements_message())
+            return redirect(url_for("app_routes.reset_password", token=token))
+
         user.set_password(password)
         db.session.commit()
         flash("Password aggiornata con successo! Ora puoi accedere.")
@@ -550,6 +583,11 @@ def profile():
             if new_password != confirm_password:
                 flash("Le nuove password non coincidono.")
                 return redirect(url_for("app_routes.profile"))
+
+            if not _validate_password_requirements(new_password):
+                flash(_password_requirements_message())
+                return redirect(url_for("app_routes.profile"))
+
             user.set_password(new_password)
 
         user.email = email
@@ -1085,6 +1123,10 @@ def admin_reset_user_password(user_id):
     new_password = (request.form.get("new_password") or "").strip()
     if not new_password:
         flash("Inserisci una nuova password valida.")
+        return redirect(url_for("app_routes.admin_maintenance"))
+
+    if not _validate_password_requirements(new_password):
+        flash(_password_requirements_message())
         return redirect(url_for("app_routes.admin_maintenance"))
 
     user.set_password(new_password)
