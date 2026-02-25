@@ -2,6 +2,8 @@ import os
 import datetime
 import re
 import random
+import threading
+from collections import defaultdict, deque
 from sqlalchemy import or_, and_
 from sqlalchemy.orm import joinedload
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash, send_from_directory
@@ -49,6 +51,8 @@ ORIGIN_QUOTES_FILE = os.path.join(os.path.dirname(__file__), "Origin.txt")
 EMAIL_REGEX = re.compile(r"^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$", re.IGNORECASE)
 PASSWORD_ALLOWED_SYMBOLS = "!£$%&^"
 SESSION_LAST_ACTIVITY_KEY = "last_activity_ts"
+_RATE_LIMIT_STORAGE_LOCK = threading.Lock()
+_RATE_LIMIT_STORAGE = defaultdict(deque)
 
 
 @app_routes.before_app_request
@@ -100,6 +104,36 @@ def _password_requirements_message():
         "La password deve essere lunga tra 8 e 15 caratteri e contenere almeno "
         "una lettera, un numero e un simbolo tra !£$%&^."
     )
+
+
+def _client_ip_address():
+    forwarded_for = request.headers.get("X-Forwarded-For", "")
+    if forwarded_for:
+        return forwarded_for.split(",", 1)[0].strip()
+    return request.remote_addr or "unknown"
+
+
+def _is_rate_limited(bucket_name, max_attempts, window_seconds):
+    if max_attempts <= 0 or window_seconds <= 0:
+        return False
+
+    client_ip = _client_ip_address()
+    bucket_key = f"{bucket_name}:{client_ip}"
+    now = datetime.datetime.utcnow()
+    threshold = now - datetime.timedelta(seconds=window_seconds)
+
+    with _RATE_LIMIT_STORAGE_LOCK:
+        bucket = _RATE_LIMIT_STORAGE[bucket_key]
+
+        while bucket and bucket[0] < threshold:
+            bucket.popleft()
+
+        if len(bucket) >= max_attempts:
+            return True
+
+        bucket.append(now)
+
+    return False
 
 
 def is_logged_in():
@@ -439,6 +473,14 @@ def register():
 @app_routes.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
+        if _is_rate_limited(
+            "login",
+            Config.LOGIN_RATE_LIMIT_ATTEMPTS,
+            Config.LOGIN_RATE_LIMIT_WINDOW_SECONDS,
+        ):
+            flash("Troppi tentativi di login. Riprova tra qualche minuto.")
+            return redirect(url_for("app_routes.login"))
+
         email = (request.form.get("email") or "").strip().lower()
         password = request.form.get("password") or ""
         user = User.query.filter_by(email=email).first()
@@ -482,6 +524,14 @@ def confirm_email(token):
 @app_routes.route("/forgot_password", methods=["GET", "POST"])
 def forgot_password():
     if request.method == "POST":
+        if _is_rate_limited(
+            "forgot-password",
+            Config.FORGOT_PASSWORD_RATE_LIMIT_ATTEMPTS,
+            Config.FORGOT_PASSWORD_RATE_LIMIT_WINDOW_SECONDS,
+        ):
+            flash("Troppi tentativi di recupero password. Riprova tra qualche minuto.")
+            return redirect(url_for("app_routes.forgot_password"))
+
         email = request.form["email"]
         user = User.query.filter_by(email=email).first()
 
