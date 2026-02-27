@@ -1378,11 +1378,7 @@ def delete_book(book_id):
 
     book = Book.query.get(book_id)
     if book:
-        file_path = os.path.join(UPLOAD_FOLDER, book.file_path)
         try:
-            if os.path.exists(file_path):
-                os.remove(file_path)
-            _delete_local_cover_if_present(book.cover_image)
             db.session.delete(book)
             db.session.commit()
             flash("Libro eliminato!")
