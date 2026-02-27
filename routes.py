@@ -1216,12 +1216,13 @@ def upload_book():
         flash("Accesso negato!")
         return redirect(url_for("app_routes.index"))
 
-    if "book_file" not in request.files:
-        flash("Nessun file selezionato!")
-        return redirect(request.url)
+    title = (request.form.get("title") or "").strip()
+    file = request.files.get("book_file")
 
-    file = request.files["book_file"]
-    title = request.form.get("title")
+    if not title or not file or not file.filename:
+        flash("Inserisci obbligatoriamente il nome del libro e il file da caricare.")
+        return redirect(url_for("app_routes.manage_books"))
+
     short_description = request.form.get("short_description")
     author = request.form.get("author")
     publication_year = request.form.get("publication_year")
@@ -1231,10 +1232,6 @@ def upload_book():
     estimated_reading_hours = request.form.get("estimated_reading_hours")
     cover_image = (request.form.get("cover_image") or "").strip() or None
     cover_image_file = request.files.get("cover_image_file")
-
-    if file.filename == "":
-        flash("Nessun file scelto!")
-        return redirect(request.url)
 
     if file and allowed_file(file.filename):
         ensure_uploads_folder()  # ✅ Ensure the directory exists before saving
@@ -1246,11 +1243,17 @@ def upload_book():
             file.save(file_path)  # ✅ Save the file
             extension = filename.rsplit(".", 1)[1].lower() if "." in filename else ""
             _sanitize_uploaded_book_file(file_path, extension)
+
+            if not os.path.isfile(file_path):
+                logging.error(f"❌ File non trovato dopo il salvataggio: {file_path}")
+                flash("Errore nel caricamento: inserisci il nome del libro e un file valido.")
+                return redirect(url_for("app_routes.manage_books"))
+
             logging.info(f"✅ Libro salvato: {file_path}")
         except Exception as e:
             logging.error(f"❌ Errore durante il salvataggio/sanitizzazione del file: {e}")
-            flash("Errore nel salvataggio del file!")
-            return redirect(request.url)
+            flash("Errore nel caricamento: inserisci il nome del libro e un file valido.")
+            return redirect(url_for("app_routes.manage_books"))
 
         # Save book in database
         parsed_publication_year = int(publication_year) if publication_year and publication_year.isdigit() else None
