@@ -1,4 +1,5 @@
 import os
+from sqlalchemy import event
 from extensions import db
 from werkzeug.security import generate_password_hash, check_password_hash
 from config import Config
@@ -86,3 +87,20 @@ class DeliveryEvent(db.Model):
     created_at = db.Column(db.DateTime, default=db.func.current_timestamp(), nullable=False)
 
     schedule = db.relationship("ReadingSchedule", backref=db.backref("delivery_events", lazy=True, cascade="all, delete-orphan"), lazy=True)
+
+
+def _remove_file_if_exists(path):
+    if path and os.path.isfile(path):
+        os.remove(path)
+
+
+@event.listens_for(Book, "after_delete")
+def delete_book_assets_on_disk(mapper, connection, target):
+    _remove_file_if_exists(target.get_absolute_path())
+
+    if not target.cover_image or not target.cover_image.startswith("covers/"):
+        return
+
+    cover_filename = target.cover_image.split("/", 1)[1]
+    cover_path = os.path.join(Config.COVER_UPLOAD_FOLDER, cover_filename)
+    _remove_file_if_exists(cover_path)
