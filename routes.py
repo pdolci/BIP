@@ -326,6 +326,7 @@ def _count_book_words(schedule):
         with open(schedule.book.get_absolute_path(), "r", encoding="utf-8", errors="replace") as source:
             words_count = len(re.findall(r"\S+", source.read()))
             schedule.book.word_count = words_count
+            db.session.commit()
             return words_count
     except Exception as error:
         logging.warning(f"⚠️ Impossibile calcolare le parole per schedule {schedule.id}: {error}")
