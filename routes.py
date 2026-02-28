@@ -6,6 +6,7 @@ from sqlalchemy import or_, and_
 from sqlalchemy.orm import joinedload
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash, send_from_directory, abort
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
+from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
 import uuid
 import chardet
@@ -56,6 +57,7 @@ ORIGIN_QUOTES_FILE = os.path.join(os.path.dirname(__file__), "Origin.txt")
 EMAIL_REGEX = re.compile(r"^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$", re.IGNORECASE)
 PASSWORD_ALLOWED_SYMBOLS = "!£$%&^"
 SESSION_LAST_ACTIVITY_KEY = "last_activity_ts"
+DUMMY_PASSWORD_HASH = generate_password_hash("dummy-password-for-login")
 
 @app_routes.before_app_request
 def enforce_session_inactivity_timeout():
@@ -490,7 +492,13 @@ def login():
         email = (request.form.get("email") or "").strip().lower()
         password = request.form.get("password") or ""
         user = User.query.filter_by(email=email).first()
-        if user and user.check_password(password):
+        password_is_valid = False
+        if user:
+            password_is_valid = user.check_password(password)
+        else:
+            check_password_hash(DUMMY_PASSWORD_HASH, password)
+
+        if user and password_is_valid:
             if not user.email_confirmed:
                 flash("Conferma prima il tuo indirizzo email tramite il link ricevuto.")
                 return redirect(url_for("app_routes.login"))
