@@ -65,6 +65,7 @@
                 {% endif %}
             </div>
             <form method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div class="mb-3">
                     <label class="form-label">Scegli un libro ({{ books|length }} risultati)</label>
                     <select id="book-select" name="book_id" class="form-select" required>

@@ -79,23 +79,28 @@
 
                         <div class="d-flex flex-wrap gap-2 mt-3">
                             <form action="{{ url_for('app_routes.pause_schedule', schedule_id=schedule.id) }}" method="post" class="d-inline">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                 <button type="submit" class="btn btn-warning btn-sm">
                                     {% if schedule.is_paused %}<i class="bi bi-play-fill"></i> Riprendi{% else %}<i class="bi bi-pause-fill"></i> Pausa{% endif %}
                                 </button>
                             </form>
                             <form action="{{ url_for('app_routes.snooze_schedule', schedule_id=schedule.id) }}" method="post" class="d-inline">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                 <input type="hidden" name="action" value="skip_next">
                                 <button type="submit" class="btn btn-outline-secondary btn-sm">Salta prossima</button>
                             </form>
                             <form action="{{ url_for('app_routes.snooze_schedule', schedule_id=schedule.id) }}" method="post" class="d-inline">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                 <input type="hidden" name="action" value="delay_24h">
                                 <button type="submit" class="btn btn-outline-secondary btn-sm">Rimanda 24h</button>
                             </form>
                             <form action="{{ url_for('app_routes.travel_mode_schedule', schedule_id=schedule.id) }}" method="post" class="d-flex gap-2 align-items-center">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                 <input type="number" name="travel_days" class="form-control form-control-sm" min="1" value="7" style="max-width: 90px;">
                                 <button type="submit" class="btn btn-outline-warning btn-sm">Viaggio</button>
                             </form>
                             <form action="{{ url_for('app_routes.delete_schedule', schedule_id=schedule.id) }}" method="post" class="d-inline">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                 <button type="submit" class="btn btn-danger btn-sm"><i class="bi bi-trash"></i> Cancella</button>
                             </form>
                         </div>
