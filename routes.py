@@ -530,7 +530,7 @@ def confirm_email(token):
 )
 def forgot_password():
     if request.method == "POST":
-        email = request.form["email"]
+        email = (request.form.get("email") or "").strip()
         user = User.query.filter_by(email=email).first()
 
         if user:
@@ -560,8 +560,8 @@ def reset_password(token):
         return redirect(url_for("app_routes.forgot_password"))
 
     if request.method == "POST":
-        password = request.form["password"]
-        confirm_password = request.form["confirm_password"]
+        password = request.form.get("password") or ""
+        confirm_password = request.form.get("confirm_password") or ""
 
         if password != confirm_password:
             flash("Le password non coincidono.")
