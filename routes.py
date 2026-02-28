@@ -132,9 +132,6 @@ def _parse_int_form_field(field_name, *, default=None, min_value=None, max_value
 
 
 def _client_ip_address():
-    forwarded_for = request.headers.get("X-Forwarded-For", "")
-    if forwarded_for:
-        return forwarded_for.split(",", 1)[0].strip()
     return request.remote_addr or "unknown"
 
 
