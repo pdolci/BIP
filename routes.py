@@ -1,9 +1,6 @@
 import os
-import datetime
 import re
 import random
-import threading
-from collections import defaultdict, deque
 from sqlalchemy import or_, and_
 from sqlalchemy.orm import joinedload
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash, send_from_directory, abort
@@ -11,7 +8,7 @@ from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 from werkzeug.utils import secure_filename
 import uuid
 import chardet
-from extensions import db
+from extensions import db, limiter
 from models import User, Book, ReadingSchedule, DeliveryEvent
 from email_sender import (
     DELIVERY_EMAIL,
@@ -58,9 +55,6 @@ ORIGIN_QUOTES_FILE = os.path.join(os.path.dirname(__file__), "Origin.txt")
 EMAIL_REGEX = re.compile(r"^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$", re.IGNORECASE)
 PASSWORD_ALLOWED_SYMBOLS = "!£$%&^"
 SESSION_LAST_ACTIVITY_KEY = "last_activity_ts"
-_RATE_LIMIT_STORAGE_LOCK = threading.Lock()
-_RATE_LIMIT_STORAGE = defaultdict(deque)
-
 
 @app_routes.before_app_request
 def enforce_session_inactivity_timeout():
@@ -120,27 +114,10 @@ def _client_ip_address():
     return request.remote_addr or "unknown"
 
 
-def _is_rate_limited(bucket_name, max_attempts, window_seconds):
-    if max_attempts <= 0 or window_seconds <= 0:
-        return False
-
-    client_ip = _client_ip_address()
-    bucket_key = f"{bucket_name}:{client_ip}"
-    now = utc_now_naive()
-    threshold = now - datetime.timedelta(seconds=window_seconds)
-
-    with _RATE_LIMIT_STORAGE_LOCK:
-        bucket = _RATE_LIMIT_STORAGE[bucket_key]
-
-        while bucket and bucket[0] < threshold:
-            bucket.popleft()
-
-        if len(bucket) >= max_attempts:
-            return True
-
-        bucket.append(now)
-
-    return False
+def _rate_limit_value(attempts, window_seconds):
+    attempts = max(int(attempts), 1)
+    window_seconds = max(int(window_seconds), 1)
+    return f"{attempts} per {window_seconds} seconds"
 
 
 def is_logged_in():
@@ -468,16 +445,16 @@ def register():
     return render_template("register.html")
 
 @app_routes.route("/login", methods=["GET", "POST"])
+@limiter.limit(
+    lambda: _rate_limit_value(
+        Config.LOGIN_RATE_LIMIT_ATTEMPTS,
+        Config.LOGIN_RATE_LIMIT_WINDOW_SECONDS,
+    ),
+    methods=["POST"],
+    key_func=_client_ip_address,
+)
 def login():
     if request.method == "POST":
-        if _is_rate_limited(
-            "login",
-            Config.LOGIN_RATE_LIMIT_ATTEMPTS,
-            Config.LOGIN_RATE_LIMIT_WINDOW_SECONDS,
-        ):
-            flash("Troppi tentativi di login. Riprova tra qualche minuto.")
-            return redirect(url_for("app_routes.login"))
-
         email = (request.form.get("email") or "").strip().lower()
         password = request.form.get("password") or ""
         user = User.query.filter_by(email=email).first()
@@ -519,16 +496,16 @@ def confirm_email(token):
     return redirect(url_for("app_routes.login"))
 
 @app_routes.route("/forgot_password", methods=["GET", "POST"])
+@limiter.limit(
+    lambda: _rate_limit_value(
+        Config.FORGOT_PASSWORD_RATE_LIMIT_ATTEMPTS,
+        Config.FORGOT_PASSWORD_RATE_LIMIT_WINDOW_SECONDS,
+    ),
+    methods=["POST"],
+    key_func=_client_ip_address,
+)
 def forgot_password():
     if request.method == "POST":
-        if _is_rate_limited(
-            "forgot-password",
-            Config.FORGOT_PASSWORD_RATE_LIMIT_ATTEMPTS,
-            Config.FORGOT_PASSWORD_RATE_LIMIT_WINDOW_SECONDS,
-        ):
-            flash("Troppi tentativi di recupero password. Riprova tra qualche minuto.")
-            return redirect(url_for("app_routes.forgot_password"))
-
         email = request.form["email"]
         user = User.query.filter_by(email=email).first()
 

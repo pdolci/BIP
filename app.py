@@ -1,11 +1,27 @@
 import os
 
-from flask import Flask
+from flask import Flask, flash, redirect, request, url_for
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 from config import Config
-from extensions import db, mail, migrate
+from extensions import db, limiter, mail, migrate
 from routes import app_routes
+
+
+def _register_rate_limit_handlers(app):
+    @app.errorhandler(429)
+    def handle_rate_limit(_error):
+        endpoint = request.endpoint or ""
+
+        if endpoint == "app_routes.login":
+            flash("Troppi tentativi di login. Riprova tra qualche minuto.")
+            return redirect(url_for("app_routes.login"))
+
+        if endpoint == "app_routes.forgot_password":
+            flash("Troppi tentativi di recupero password. Riprova tra qualche minuto.")
+            return redirect(url_for("app_routes.forgot_password"))
+
+        return "Too many requests", 429
 
 
 def _validate_startup_prerequisites(app):
@@ -35,6 +51,7 @@ def create_app(config_class=Config):
     db.init_app(app)
     mail.init_app(app)
     migrate.init_app(app, db)
+    limiter.init_app(app)
 
     app.register_blueprint(app_routes)
 
@@ -48,6 +65,7 @@ def create_app(config_class=Config):
             x_prefix=app.config.get("PROXY_FIX_X_PREFIX", 0),
         )
 
+    _register_rate_limit_handlers(app)
     _validate_startup_prerequisites(app)
     return app
 
