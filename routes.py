@@ -6,7 +6,7 @@ import threading
 from collections import defaultdict, deque
 from sqlalchemy import or_, and_
 from sqlalchemy.orm import joinedload
-from flask import Blueprint, render_template, request, redirect, url_for, session, flash, send_from_directory
+from flask import Blueprint, render_template, request, redirect, url_for, session, flash, send_from_directory, abort
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 from werkzeug.utils import secure_filename
 import uuid
@@ -1348,7 +1348,17 @@ def edit_book(book_id):
 
 @app_routes.route("/uploads/books/<filename>")
 def uploaded_file(filename):
-    return send_from_directory(UPLOAD_FOLDER, filename)
+    # I file dei libri non devono mai essere esposti pubblicamente tramite filename,
+    # altrimenti è possibile aggirare completamente il meccanismo di lettura a rate.
+    if not is_logged_in() or not has_book_management_access():
+        logging.warning(
+            "Tentativo non autorizzato di accesso diretto a file libro: %s (ip=%s)",
+            filename,
+            _client_ip_address(),
+        )
+        abort(404)
+
+    return send_from_directory(UPLOAD_FOLDER, filename, as_attachment=True)
 
 
 @app_routes.route("/uploads/covers/<filename>")
