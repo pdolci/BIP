@@ -1,7 +1,7 @@
 import os
 import re
 import random
-import datetime
+from datetime import date, datetime, time, timedelta
 from sqlalchemy import or_, and_
 from sqlalchemy.orm import joinedload
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash, send_from_directory, abort
@@ -319,7 +319,7 @@ def _compute_streak(sent_events):
     for day in sent_days:
         if day == cursor:
             streak += 1
-            cursor = cursor - datetime.timedelta(days=1)
+            cursor = cursor - timedelta(days=1)
         elif day < cursor:
             break
     return streak
@@ -843,7 +843,7 @@ def snooze_schedule(schedule_id):
         flash("La prossima consegna sarà saltata.")
     elif action == "delay_24h":
         base_time = schedule.next_send_date if schedule.next_send_date and schedule.next_send_date > now else now
-        schedule.snooze_until = base_time + datetime.timedelta(hours=24)
+        schedule.snooze_until = base_time + timedelta(hours=24)
         schedule.next_send_date = schedule.snooze_until
         schedule.skip_next = False
         flash("Consegna rimandata di 24 ore.")
@@ -882,16 +882,16 @@ def travel_mode(schedule_id):
         return redirect(url_for("app_routes.select_book"))
 
     try:
-        resume_date = datetime.date.fromisoformat(resume_date_raw)
+        resume_date = date.fromisoformat(resume_date_raw)
     except ValueError:
         flash("Data di ripartenza non valida.")
         return redirect(url_for("app_routes.select_book"))
 
     resume_time = parse_time_str(resume_time_raw)
     if resume_time is None:
-        resume_time = schedule.delivery_time or datetime.time(9, 0)
+        resume_time = schedule.delivery_time or time(9, 0)
 
-    resume_at_local = datetime.datetime.combine(resume_date, resume_time)
+    resume_at_local = datetime.combine(resume_date, resume_time)
     resume_at = local_naive_to_utc_naive(resume_at_local)
 
     if resume_at <= now:
@@ -967,7 +967,7 @@ def snooze_24h_schedule(schedule_id):
         return redirect(url_for("app_routes.select_book"))
 
     now = utc_now_naive()
-    schedule.next_send_date = max(schedule.next_send_date, now) + datetime.timedelta(hours=24)
+    schedule.next_send_date = max(schedule.next_send_date, now) + timedelta(hours=24)
     db.session.add(DeliveryEvent(
         schedule_id=schedule.id,
         event_type="skipped",
@@ -996,7 +996,7 @@ def travel_mode_schedule(schedule_id):
         return redirect(url_for("app_routes.select_book"))
 
     now = utc_now_naive()
-    schedule.travel_pause_until = now + datetime.timedelta(days=travel_days)
+    schedule.travel_pause_until = now + timedelta(days=travel_days)
     if schedule.next_send_date < schedule.travel_pause_until:
         schedule.next_send_date = schedule.travel_pause_until
     db.session.add(DeliveryEvent(
