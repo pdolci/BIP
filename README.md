@@ -37,8 +37,20 @@ Variabili opzionali principali:
 - `PROXY_FIX_X_HOST` (default: `0`)
 - `PROXY_FIX_X_PORT` (default: `0`)
 - `PROXY_FIX_X_PREFIX` (default: `0`)
+- `STARTUP_GUARDRAILS_ENABLED` (default: `true`; se `true` l'app rifiuta l'avvio se manca il setup cartelle)
 
 ## Avvio in locale (sviluppo)
+
+Prima dell'avvio dell'applicazione esegui il setup iniziale in un programma dedicato:
+
+```bash
+python server_setup.py
+```
+
+Questo comando si occupa di:
+- creazione cartelle (`uploads/books`, `uploads/covers`)
+- applicazione migrazioni database
+- inizializzazione tabelle (se mancanti)
 
 Web app (sviluppo):
 
@@ -60,6 +72,12 @@ python scheduler_worker.py
 
 ## Avvio in produzione
 
+Esegui una volta (o ad ogni deploy) il setup:
+
+```bash
+python server_setup.py
+```
+
 Web app WSGI (Gunicorn):
 
 ```bash
@@ -75,4 +93,5 @@ python scheduler_worker.py
 ## Note operative
 
 - Lo scheduler **non** viene più avviato automaticamente dal processo web.
+- Se il setup non è stato eseguito, web app e worker terminano subito con errore esplicito e istruzione a lanciare `python server_setup.py`.
 - I file libro caricabili supportano `.txt`, `.html` e `.htm`; il parsing di invio converte l'HTML in testo per conteggio parole e chunking.

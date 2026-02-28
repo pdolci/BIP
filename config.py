@@ -101,3 +101,5 @@ class Config:
     PROXY_FIX_X_HOST = _get_int_env("PROXY_FIX_X_HOST", 0)
     PROXY_FIX_X_PORT = _get_int_env("PROXY_FIX_X_PORT", 0)
     PROXY_FIX_X_PREFIX = _get_int_env("PROXY_FIX_X_PREFIX", 0)
+
+    STARTUP_GUARDRAILS_ENABLED = _get_bool_env("STARTUP_GUARDRAILS_ENABLED", True)

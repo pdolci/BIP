@@ -213,20 +213,11 @@ def _sanitize_uploaded_book_file(file_path, extension):
         target.write(sanitized)
 
 
-def ensure_cover_uploads_folder():
-    """ Crea la cartella uploads/covers se non esiste """
-    try:
-        os.makedirs(COVER_UPLOAD_FOLDER, exist_ok=True)
-    except Exception as e:
-        logging.error(f"❌ Errore nella creazione della cartella copertine: {e}")
-
-
 def _store_cover_on_disk(file_storage):
     extension = _extract_cover_file_extension(file_storage)
     if not extension:
         return None
 
-    ensure_cover_uploads_folder()
     cover_filename = f"{uuid.uuid4().hex}.{extension}"
     destination = os.path.join(COVER_UPLOAD_FOLDER, cover_filename)
     file_storage.save(destination)
@@ -428,13 +419,6 @@ def get_reset_token_serializer():
 def allowed_file(filename):
     """ Controlla se il file ha un'estensione permessa """
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
-
-def ensure_uploads_folder():
-    """ Crea la cartella uploads/books se non esiste """
-    try:
-        os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-    except Exception as e:
-        logging.error(f"❌ Errore nella creazione della cartella: {e}")
 
 @app_routes.route("/")
 def index():
@@ -1249,8 +1233,6 @@ def upload_book():
     cover_image_file = request.files.get("cover_image_file")
 
     if file and allowed_file(file.filename):
-        ensure_uploads_folder()  # ✅ Ensure the directory exists before saving
-
         filename = secure_filename(file.filename)
         file_path = os.path.join(UPLOAD_FOLDER, filename)
         
@@ -1366,13 +1348,11 @@ def edit_book(book_id):
 
 @app_routes.route("/uploads/books/<filename>")
 def uploaded_file(filename):
-    ensure_uploads_folder()
     return send_from_directory(UPLOAD_FOLDER, filename)
 
 
 @app_routes.route("/uploads/covers/<filename>")
 def uploaded_cover(filename):
-    ensure_cover_uploads_folder()
     return send_from_directory(COVER_UPLOAD_FOLDER, filename)
 
 
