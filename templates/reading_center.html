@@ -39,7 +39,7 @@
                 <li class="list-group-item d-flex justify-content-between align-items-start">
                     <div>
                         <strong>{{ item.book_title }}</strong>
-                        <div class="text-muted small">{{ item.created_at.strftime('%d/%m/%Y %H:%M') }}</div>
+                        <div class="text-muted small">{{ format_app_datetime(item.created_at) }}</div>
                     </div>
                     <span class="small">
                         {% if item.event_type == 'sent' %}✅ Inviata{% elif item.event_type == 'skipped' %}⚠️ Saltata{% elif item.event_type == 'paused' %}⏸️ Pausa{% elif item.event_type == 'resumed' %}▶️ Ripresa{% else %}{{ item.event_type }}{% endif %}
@@ -71,10 +71,10 @@
                         <div class="small text-muted mt-2">Orario: {{ schedule.delivery_time.strftime('%H:%M') if schedule.delivery_time else '08:00 (default)' }}</div>
                         <div class="small text-muted">Canale: {{ describe_delivery_channel(schedule) }}</div>
                         {% if schedule.next_send_date %}
-                        <div class="small text-muted">Prossimo invio: {{ schedule.next_send_date.strftime('%d/%m/%Y %H:%M') }}</div>
+                        <div class="small text-muted">Prossimo invio: {{ format_app_datetime(schedule.next_send_date) }}</div>
                         {% endif %}
                         {% if schedule.travel_pause_until %}
-                        <div class="small text-warning">Modalità viaggio fino al {{ schedule.travel_pause_until.strftime('%d/%m/%Y %H:%M') }}</div>
+                        <div class="small text-warning">Modalità viaggio fino al {{ format_app_datetime(schedule.travel_pause_until) }}</div>
                         {% endif %}
 
                         <div class="d-flex flex-wrap gap-2 mt-3">

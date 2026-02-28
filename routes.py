@@ -34,7 +34,14 @@ from schedule_utils import (
     FREQ_WEEKEND,
 )
 import logging
-from time_utils import utc_now_naive, local_now_naive, local_naive_to_utc_naive
+from time_utils import (
+    utc_now_naive,
+    utc_now_timestamp,
+    local_now_naive,
+    local_naive_to_utc_naive,
+    utc_naive_to_local_naive,
+    compute_next_send_utc,
+)
 from html_processing import sanitize_uploaded_html
 
 UPLOAD_FOLDER = Config.UPLOAD_FOLDER
@@ -66,7 +73,7 @@ def enforce_session_inactivity_timeout():
         return None
 
     timeout_seconds = max(Config.SESSION_INACTIVITY_MINUTES, 1) * 60
-    now_ts = int(datetime.datetime.utcnow().timestamp())
+    now_ts = utc_now_timestamp()
     last_activity_ts = session.get(SESSION_LAST_ACTIVITY_KEY)
 
     if isinstance(last_activity_ts, int) and now_ts - last_activity_ts > timeout_seconds:
@@ -119,7 +126,7 @@ def _is_rate_limited(bucket_name, max_attempts, window_seconds):
 
     client_ip = _client_ip_address()
     bucket_key = f"{bucket_name}:{client_ip}"
-    now = datetime.datetime.utcnow()
+    now = utc_now_naive()
     threshold = now - datetime.timedelta(seconds=window_seconds)
 
     with _RATE_LIMIT_STORAGE_LOCK:
@@ -337,7 +344,7 @@ def _compute_streak(sent_events):
     if not sent_events:
         return 0
 
-    sent_days = sorted({event.created_at.date() for event in sent_events}, reverse=True)
+    sent_days = sorted({utc_naive_to_local_naive(event.created_at).date() for event in sent_events}, reverse=True)
     streak = 0
     cursor = sent_days[0]
     for day in sent_days:
@@ -407,6 +414,12 @@ def _build_dashboard(active_schedules):
         "streak_days": _compute_streak(sent_events),
         "history": history[:20],
     }
+
+
+def format_app_datetime(value, fmt="%d/%m/%Y %H:%M", default="n/d"):
+    if value is None:
+        return default
+    return utc_naive_to_local_naive(value).strftime(fmt)
 
 def get_reset_token_serializer():
     """Crea il serializer usato per il recupero password."""
@@ -492,7 +505,7 @@ def login():
             session["is_admin"] = user.is_admin
             session["is_content_manager"] = user.is_content_manager
             session.permanent = True
-            session[SESSION_LAST_ACTIVITY_KEY] = int(datetime.datetime.utcnow().timestamp())
+            session[SESSION_LAST_ACTIVITY_KEY] = utc_now_timestamp()
             flash("Login riuscito!")
             return redirect(url_for("app_routes.index"))
         else:
@@ -844,6 +857,7 @@ def reading_center():
         dashboard=dashboard,
         describe_frequency=describe_frequency,
         describe_delivery_channel=describe_delivery_channel,
+        format_app_datetime=format_app_datetime,
     )
 
 
@@ -967,7 +981,7 @@ def snooze_next_schedule(schedule_id):
 
     now = utc_now_naive()
     reference = max(schedule.next_send_date, now)
-    schedule.next_send_date = compute_next_send_datetime(reference, schedule, allow_immediate=False)
+    schedule.next_send_date = compute_next_send_utc(schedule, reference, allow_immediate=False)
     db.session.add(DeliveryEvent(
         schedule_id=schedule.id,
         event_type="skipped",
@@ -1091,6 +1105,7 @@ def admin_maintenance():
         due_schedules=len(due_schedules),
         describe_frequency=describe_frequency,
         describe_delivery_channel=describe_delivery_channel,
+        format_app_datetime=format_app_datetime,
     )
 
 
