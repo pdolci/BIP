@@ -15,8 +15,7 @@ from sqlalchemy.orm import joinedload
 from config import Config
 from extensions import db, mail
 from models import DeliveryEvent, ReadingSchedule
-from schedule_utils import compute_next_send_datetime
-from time_utils import utc_now_naive
+from time_utils import utc_now_naive, compute_next_send_utc
 
 ANSI_ESCAPE_RE = re.compile(r"\x1B(?:\[[0-?]*[ -/]*[@-~]|[@-Z\\-_])")
 CONTROL_CHARS_RE = re.compile(r"[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]")
@@ -477,7 +476,7 @@ def send_next_book_part(schedule_id):
     try:
         # 4) Persistenza stato avanzamento + audit della consegna.
         schedule.last_sent_index = new_index
-        schedule.next_send_date = compute_next_send_datetime(utc_now_naive(), schedule, allow_immediate=False)
+        schedule.next_send_date = compute_next_send_utc(schedule, utc_now_naive(), allow_immediate=False)
         db.session.add(
             DeliveryEvent(
                 schedule_id=schedule.id,

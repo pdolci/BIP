@@ -6,8 +6,7 @@ from flask import Flask
 from email_sender import send_next_book_part
 from extensions import db
 from models import ReadingSchedule
-from schedule_utils import compute_next_send_datetime
-from time_utils import utc_now_naive
+from time_utils import utc_now_naive, compute_next_send_utc
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
@@ -38,7 +37,7 @@ def _handle_skip_next(schedule, now):
     if not schedule.skip_next:
         return False
     schedule.skip_next = False
-    schedule.next_send_date = compute_next_send_datetime(now, schedule, allow_immediate=False)
+    schedule.next_send_date = compute_next_send_utc(schedule, now, allow_immediate=False)
     db.session.commit()
     return True
 

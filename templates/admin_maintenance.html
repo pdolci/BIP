@@ -65,7 +65,7 @@
                                                 {{ describe_frequency(schedule) }} · {{ describe_delivery_channel(schedule) }}
                                             </div>
                                             <div class="small text-muted">
-                                                Ultimo indice inviato: {{ schedule.last_sent_index }} · Prossimo invio: {{ schedule.next_send_date.strftime('%d/%m/%Y %H:%M') if schedule.next_send_date else 'n/d' }}
+                                                Ultimo indice inviato: {{ schedule.last_sent_index }} · Prossimo invio: {{ format_app_datetime(schedule.next_send_date) }}
                                             </div>
                                         </td>
                                         <td>
