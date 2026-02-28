@@ -107,15 +107,84 @@ class HtmlSanitizer(HTMLParser):
 
 def emphasize_chapter_titles(sanitized_html):
     """Converte intestazioni e paragrafi capitolo in <h2>."""
-    normalized = re.sub(r"<\s*/?h[1-6]\b", lambda m: "</h2" if m.group(0).startswith("</") else "<h2", sanitized_html, flags=re.IGNORECASE)
 
-    def _replace_paragraph(match):
-        full_text = html.unescape(re.sub(r"<[^>]+>", "", match.group(1))).strip()
-        if CHAPTER_TITLE_RE.match(full_text) or ROMAN_OR_NUMERIC_TITLE_RE.match(full_text):
-            return f"<h2>{match.group(1).strip()}</h2>"
-        return match.group(0)
+    class ChapterTitleTransformer(HTMLParser):
+        def __init__(self):
+            super().__init__(convert_charrefs=False)
+            self.output = []
+            self.in_paragraph = False
+            self.paragraph_inner = []
+            self.paragraph_text = []
 
-    return re.sub(r"<p>(.*?)</p>", _replace_paragraph, normalized, flags=re.IGNORECASE | re.DOTALL)
+        @staticmethod
+        def _render_tag(tag, attrs, close=False, self_close=False):
+            if close:
+                return f"</{tag}>"
+            attrs_chunk = "".join([f' {key}="{html.escape(value or "", quote=True)}"' for key, value in attrs])
+            suffix = " /" if self_close else ""
+            return f"<{tag}{attrs_chunk}{suffix}>"
+
+        def _append_chunk(self, chunk, text_equivalent=""):
+            if self.in_paragraph:
+                self.paragraph_inner.append(chunk)
+                if text_equivalent:
+                    self.paragraph_text.append(text_equivalent)
+                return
+            self.output.append(chunk)
+
+        def handle_starttag(self, tag, attrs):
+            normalized_tag = (tag or "").lower()
+            if normalized_tag == "p":
+                self.in_paragraph = True
+                self.paragraph_inner = []
+                self.paragraph_text = []
+                return
+            if normalized_tag in {"h1", "h2", "h3", "h4", "h5", "h6"}:
+                self._append_chunk("<h2>")
+                return
+            self._append_chunk(self._render_tag(normalized_tag, attrs))
+
+        def handle_endtag(self, tag):
+            normalized_tag = (tag or "").lower()
+            if normalized_tag == "p" and self.in_paragraph:
+                paragraph_text = html.unescape("".join(self.paragraph_text)).strip()
+                inner_html = "".join(self.paragraph_inner).strip()
+                if CHAPTER_TITLE_RE.match(paragraph_text) or ROMAN_OR_NUMERIC_TITLE_RE.match(paragraph_text):
+                    self.output.append(f"<h2>{inner_html}</h2>")
+                else:
+                    self.output.append(f"<p>{inner_html}</p>")
+                self.in_paragraph = False
+                self.paragraph_inner = []
+                self.paragraph_text = []
+                return
+            if normalized_tag in {"h1", "h2", "h3", "h4", "h5", "h6"}:
+                self._append_chunk("</h2>")
+                return
+            self._append_chunk(self._render_tag(normalized_tag, [], close=True))
+
+        def handle_startendtag(self, tag, attrs):
+            normalized_tag = (tag or "").lower()
+            self._append_chunk(self._render_tag(normalized_tag, attrs, self_close=True))
+
+        def handle_data(self, data):
+            escaped = html.escape(data)
+            self._append_chunk(escaped, text_equivalent=data)
+
+        def handle_entityref(self, name):
+            chunk = f"&{name};"
+            self._append_chunk(chunk, text_equivalent=html.unescape(chunk))
+
+        def handle_charref(self, name):
+            chunk = f"&#{name};"
+            self._append_chunk(chunk, text_equivalent=html.unescape(chunk))
+
+        def get_html(self):
+            return "".join(self.output)
+
+    transformer = ChapterTitleTransformer()
+    transformer.feed(sanitized_html)
+    transformer.close()
+    return transformer.get_html()
 
 
 def sanitize_uploaded_html(content):

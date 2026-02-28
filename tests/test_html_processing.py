@@ -29,5 +29,20 @@ class HtmlProcessingTests(unittest.TestCase):
         self.assertIn("<p>Testo normale.</p>", result)
 
 
+    def test_chapter_heading_preserves_safe_inline_formatting(self):
+        source = """
+        <p><strong>Capitolo 3</strong> - <em>Arrivo</em></p>
+        """
+        result = sanitize_uploaded_html(source)
+        self.assertIn("<h2><strong>Capitolo 3</strong> - <em>Arrivo</em></h2>", result)
+    def test_chapter_heading_conversion_escapes_inner_html(self):
+        source = """
+        <p>Capitolo 2 - &lt;img src=x onerror=alert(1)&gt;</p>
+        """
+        result = sanitize_uploaded_html(source)
+        self.assertIn("<h2>Capitolo 2 - &lt;img src=x onerror=alert(1)&gt;</h2>", result)
+        self.assertNotIn("<img", result)
+
+
 if __name__ == "__main__":
     unittest.main()
