@@ -330,6 +330,16 @@ def _count_book_words(schedule):
         return 0
 
 
+def _is_schedule_completed(schedule, total_words=None):
+    if total_words is None:
+        total_words = _count_book_words(schedule)
+
+    if total_words <= 0:
+        return False
+
+    return schedule.last_sent_index >= total_words
+
+
 def _compute_streak(sent_events):
     if not sent_events:
         return 0
@@ -982,6 +992,11 @@ def snooze_next_schedule(schedule_id):
         flash("Operazione non consentita.")
         return redirect(url_for("app_routes.select_book"))
 
+    total_words = _count_book_words(schedule)
+    if _is_schedule_completed(schedule, total_words):
+        flash("Libro già completato: non puoi rimandare ulteriormente questa consegna.")
+        return redirect(url_for("app_routes.select_book"))
+
     now = utc_now_naive()
     reference = max(schedule.next_send_date, now)
     schedule.next_send_date = compute_next_send_utc(schedule, reference, allow_immediate=False)
@@ -1005,6 +1020,11 @@ def snooze_24h_schedule(schedule_id):
     schedule = ReadingSchedule.query.get(schedule_id)
     if not schedule or schedule.user_id != session["user_id"]:
         flash("Operazione non consentita.")
+        return redirect(url_for("app_routes.select_book"))
+
+    total_words = _count_book_words(schedule)
+    if _is_schedule_completed(schedule, total_words):
+        flash("Libro già completato: non puoi rimandare ulteriormente questa consegna.")
         return redirect(url_for("app_routes.select_book"))
 
     now = utc_now_naive()
