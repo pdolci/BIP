@@ -108,6 +108,29 @@ def _password_requirements_message():
     )
 
 
+def _parse_int_form_field(field_name, *, default=None, min_value=None, max_value=None, label=None):
+    raw_value = request.form.get(field_name)
+
+    if raw_value in (None, ""):
+        if default is not None:
+            value = default
+        else:
+            raise ValueError(f"Il campo {label or field_name} è obbligatorio.")
+    else:
+        try:
+            value = int(raw_value)
+        except (TypeError, ValueError):
+            raise ValueError(f"Il campo {label or field_name} deve essere un numero intero.")
+
+    if min_value is not None and value < min_value:
+        raise ValueError(f"Il campo {label or field_name} deve essere almeno {min_value}.")
+
+    if max_value is not None and value > max_value:
+        raise ValueError(f"Il campo {label or field_name} non può superare {max_value}.")
+
+    return value
+
+
 def _client_ip_address():
     forwarded_for = request.headers.get("X-Forwarded-For", "")
     if forwarded_for:
@@ -676,12 +699,32 @@ def select_book():
 
     if request.method == "POST":
         book_id = request.form["book_id"]
-        minutes_per_reading = int(request.form["minutes_per_reading"])
-        words_per_minute = int(request.form.get("words_per_minute", 200))
+        try:
+            minutes_per_reading = _parse_int_form_field(
+                "minutes_per_reading",
+                min_value=1,
+                max_value=30,
+                label="minuti per lettura",
+            )
+            words_per_minute = _parse_int_form_field(
+                "words_per_minute",
+                default=200,
+                min_value=1,
+                label="parole al minuto",
+            )
+            frequency_days = _parse_int_form_field(
+                "frequency_days",
+                default=1,
+                min_value=1,
+                label="frequenza in giorni",
+            )
+        except ValueError as error:
+            flash(str(error))
+            return redirect(url_for("app_routes.select_book"))
+
         frequency_type = request.form.get("frequency_type") or request.form.get("frequency_mode", FREQ_EVERY_N_DAYS)
         if frequency_type == "interval":
             frequency_type = FREQ_EVERY_N_DAYS
-        frequency_days = int(request.form.get("frequency_days", 1) or 1)
         delivery_time = parse_time_str(request.form.get("delivery_time"))
         weekdays_selected = request.form.getlist("weekdays") or request.form.getlist("frequency_weekdays")
         current_user = User.query.get(user_id)
