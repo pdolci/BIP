@@ -4,7 +4,7 @@ from flask import Flask, flash, redirect, request, url_for
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 from config import Config
-from extensions import db, limiter, mail, migrate
+from extensions import csrf, db, limiter, mail, migrate
 from routes import app_routes
 
 
@@ -52,6 +52,7 @@ def create_app(config_class=Config):
     mail.init_app(app)
     migrate.init_app(app, db)
     limiter.init_app(app)
+    csrf.init_app(app)
 
     app.register_blueprint(app_routes)
 

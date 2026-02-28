@@ -10,6 +10,7 @@
         <div class="card panel-card p-4 h-100">
             <h3 class="mb-3">Carica un nuovo libro</h3>
             <form action="{{ url_for('app_routes.upload_book') }}" method="post" enctype="multipart/form-data">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div class="mb-3">
                     <label for="title" class="form-label">Titolo</label>
                     <input type="text" name="title" required class="form-control">
@@ -106,10 +107,12 @@
                                 </button>
 
                                 <form action="{{ url_for('app_routes.delete_book', book_id=book.id) }}" method="post" class="d-inline">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                     <button type="submit" class="btn btn-outline-danger btn-sm"><i class="bi bi-trash"></i> Elimina</button>
                                 </form>
 
                                 <form action="{{ url_for('app_routes.toggle_book_status', book_id=book.id) }}" method="post" class="d-inline">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                     <button type="submit" class="btn btn-outline-warning btn-sm">{{ "Disattiva" if book.is_active else "Attiva" }}</button>
                                 </form>
                             </td>
@@ -117,6 +120,7 @@
                         <tr class="collapse" id="edit-book-{{ book.id }}">
                             <td colspan="3" class="bg-light">
                                 <form action="{{ url_for('app_routes.edit_book', book_id=book.id) }}" method="post" enctype="multipart/form-data" class="row g-3">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                     <div class="col-md-6">
                                         <label class="form-label">Titolo</label>
                                         <input type="text" name="title" class="form-control" value="{{ book.title }}" required>

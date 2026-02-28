@@ -5,6 +5,7 @@
     <div class="card auth-card p-4" style="max-width: 430px; width: 100%;">
         <h2 class="text-center mb-4"><i class="bi bi-key me-2"></i>Accedi</h2>
         <form method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div class="mb-3">
                 <label class="form-label">Email</label>
                 <input type="email" name="email" class="form-control" required>

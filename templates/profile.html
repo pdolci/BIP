@@ -7,6 +7,7 @@
             <div class="card-body p-4 p-md-5">
                 <h1 class="h4 mb-4"><i class="bi bi-person-lines-fill me-2"></i>Il tuo profilo</h1>
                 <form method="POST" class="row g-3">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <div class="col-12">
                         <label class="form-label" for="email">Email</label>
                         <input class="form-control" id="email" name="email" type="email" value="{{ user.email }}" required>
@@ -54,6 +55,7 @@
                     <h2 class="h6 text-danger mb-2"><i class="bi bi-exclamation-triangle me-1"></i>Disiscrizione completa</h2>
                     <p class="small mb-3">Questa operazione elimina definitivamente account, sottoscrizioni e storico invii dal database.</p>
                     <form method="POST" action="{{ url_for('app_routes.delete_account') }}" class="row g-2">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <div class="col-md-8">
                             <input class="form-control" type="text" name="delete_confirmation" placeholder="Digita ELIMINA per confermare" required>
                         </div>

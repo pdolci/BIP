@@ -80,19 +80,24 @@
                                         <td class="text-end">
                                             <div class="d-flex flex-wrap justify-content-end gap-2">
                                                 <form action="{{ url_for('app_routes.admin_reset_user_password', user_id=user.id) }}" method="post" class="d-flex gap-1">
+                                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                                     <input type="password" name="new_password" class="form-control form-control-sm" placeholder="Nuova password" minlength="8" maxlength="15" pattern="(?=.*[A-Za-z])(?=.*\d)(?=.*[!£$%&^])[A-Za-z\d!£$%&^]{8,15}" title="8-15 caratteri, con almeno una lettera, un numero e un simbolo tra !£$%&^." required>
                                                     <button class="btn btn-sm btn-outline-dark" type="submit">Reset password</button>
                                                 </form>
                                                 <form action="{{ url_for('app_routes.admin_delete_user', user_id=user.id) }}" method="post" onsubmit="return confirm('Confermi la cancellazione definitiva di {{ user.email }}?');">
+                                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                                     <button class="btn btn-sm btn-danger" type="submit">Elimina utente</button>
                                                 </form>
                                                 <form action="{{ url_for('app_routes.admin_toggle_pause_schedule', schedule_id=schedule.id) }}" method="post">
+                                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                                     <button class="btn btn-sm btn-outline-warning" type="submit">{{ 'Riprendi' if schedule.is_paused else 'Pausa' }}</button>
                                                 </form>
                                                 <form action="{{ url_for('app_routes.admin_recompute_schedule', schedule_id=schedule.id) }}" method="post">
+                                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                                     <button class="btn btn-sm btn-outline-primary" type="submit">Ricalcola invio</button>
                                                 </form>
                                                 <form action="{{ url_for('app_routes.admin_reset_schedule_progress', schedule_id=schedule.id) }}" method="post">
+                                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                                     <button class="btn btn-sm btn-outline-danger" type="submit">Reset progresso</button>
                                                 </form>
                                             </div>
@@ -114,10 +119,12 @@
                                     <td class="text-end">
                                         <div class="d-flex flex-wrap justify-content-end gap-2">
                                             <form action="{{ url_for('app_routes.admin_reset_user_password', user_id=user.id) }}" method="post" class="d-flex gap-1">
+                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                                 <input type="password" name="new_password" class="form-control form-control-sm" placeholder="Nuova password" minlength="8" maxlength="15" pattern="(?=.*[A-Za-z])(?=.*\d)(?=.*[!£$%&^])[A-Za-z\d!£$%&^]{8,15}" title="8-15 caratteri, con almeno una lettera, un numero e un simbolo tra !£$%&^." required>
                                                 <button class="btn btn-sm btn-outline-dark" type="submit">Reset password</button>
                                             </form>
                                             <form action="{{ url_for('app_routes.admin_delete_user', user_id=user.id) }}" method="post" onsubmit="return confirm('Confermi la cancellazione definitiva di {{ user.email }}?');">
+                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                                 <button class="btn btn-sm btn-danger" type="submit">Elimina utente</button>
                                             </form>
                                         </div>
