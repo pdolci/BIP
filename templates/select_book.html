@@ -52,171 +52,33 @@
 
     <div class="col-lg-10">
         <div class="card panel-card p-4">
-            <div class="d-flex justify-content-between align-items-start gap-3 mb-4">
-                <h2 class="mb-0"><i class="bi bi-sliders me-2"></i>Configura la tua lettura</h2>
-                {% if books %}
-                <img
-                    id="selected-book-cover"
-                    class="selected-book-cover"
-                    src="{{ url_for('app_routes.book_cover', book_id=selected_book.id) }}"
-                    alt="Copertina del libro selezionato"
-                    loading="lazy"
-                >
-                {% endif %}
+            <h2 class="mb-3"><i class="bi bi-book me-2"></i>Risultati ({{ books|length }})</h2>
+            {% if books %}
+            <div class="list-group">
+                {% for book in books %}
+                <div class="list-group-item d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+                    <div>
+                        <h5 class="mb-1">{{ book.title }}</h5>
+                        <p class="mb-1 text-muted small">
+                            {{ book.author or 'Autore n/d' }} · {{ book.publication_year or 'Anno n/d' }} · {{ book.genre or 'Genere n/d' }} · {{ book.language or 'Lingua n/d' }}
+                        </p>
+                        <p class="mb-0 small">{{ book.short_description or 'Nessuna descrizione disponibile.' }}</p>
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        {% if book.estimated_reading_hours %}
+                        <span class="badge text-bg-primary">{{ book.estimated_reading_hours }} ore</span>
+                        {% endif %}
+                        <a href="{{ url_for('app_routes.configure_reading', book_id=book.id) }}" class="btn btn-primary btn-sm">
+                            Configura lettura
+                        </a>
+                    </div>
+                </div>
+                {% endfor %}
             </div>
-            <form method="POST">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <div class="mb-3">
-                    <label class="form-label">Scegli un libro ({{ books|length }} risultati)</label>
-                    <select id="book-select" name="book_id" class="form-select" required>
-                        {% for book in books %}
-                            <option
-                                value="{{ book.id }}"
-                                {% if selected_book and book.id == selected_book.id %}selected{% endif %}
-                                data-title="{{ book.title }}"
-                                data-author="{{ book.author or 'Autore n/d' }}"
-                                data-year="{{ book.publication_year or 'Anno n/d' }}"
-                                data-genre="{{ book.genre or 'Genere n/d' }}"
-                                data-language="{{ book.language or 'Lingua n/d' }}"
-                                data-tags="{{ book.tags or '' }}"
-                                data-description="{{ book.short_description or '' }}"
-                                data-hours="{{ book.estimated_reading_hours or '' }}"
-                                data-cover="{{ url_for('app_routes.book_cover', book_id=book.id) }}"
-                            >
-                                {{ book.title }}{% if book.author %} — {{ book.author }}{% endif %}{% if book.estimated_reading_hours %} · {{ book.estimated_reading_hours }}h{% endif %}
-                            </option>
-                        {% endfor %}
-                    </select>
-                </div>
-
-                {% if books %}
-                <div class="mb-3 p-3 border rounded bg-light" id="book-preview">
-                    <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
-                        <div>
-                            <strong id="preview-title">{{ selected_book.title }}</strong>
-                            <div class="text-muted small" id="preview-meta">
-                                {{ selected_book.author or 'Autore n/d' }} · {{ selected_book.publication_year or 'Anno n/d' }} · {{ selected_book.genre or 'Genere n/d' }} · {{ selected_book.language or 'Lingua n/d' }}
-                            </div>
-                        </div>
-                        <span class="badge text-bg-primary" id="preview-hours">
-                            {% if selected_book.estimated_reading_hours %}{{ selected_book.estimated_reading_hours }} ore{% else %}Durata n/d{% endif %}
-                        </span>
-                    </div>
-                    <div class="small mt-2" id="preview-description">{{ selected_book.short_description or 'Nessuna descrizione disponibile.' }}</div>
-                    <div class="small text-muted mt-2" id="preview-tags">
-                        {% if selected_book.tags %}Tag: {{ selected_book.tags }}{% else %}Tag: n/d{% endif %}
-                    </div>
-                </div>
-                {% else %}
-                <div class="alert alert-warning">Nessun libro trovato con i filtri selezionati.</div>
-                {% endif %}
-
-                <div class="mb-3">
-                    <label class="form-label">Minuti per sessione di lettura</label>
-                    <input type="number" name="minutes_per_reading" class="form-control" required>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Frequenza di invio</label>
-                    <select name="frequency_type" id="frequency-type" class="form-select">
-                        <option value="every_n_days">Ogni N giorni</option>
-                        <option value="daily">Giornaliera</option>
-                        <option value="weekdays">Giorni specifici</option>
-                        <option value="weekend">Solo weekend</option>
-                    </select>
-                </div>
-                <div class="mb-3" id="frequency-days-group">
-                    <label class="form-label">Ogni quanti giorni (se scegli "Ogni N giorni")</label>
-                    <input type="number" name="frequency_days" class="form-control" value="1" min="1">
-                </div>
-                <div class="mb-3 d-none" id="weekdays-group">
-                    <label class="form-label">Giorni specifici (Lun/Mer/Ven...)</label>
-                    <div class="d-flex flex-wrap gap-2">
-                        {% set weekday_labels = [('0','Lun'),('1','Mar'),('2','Mer'),('3','Gio'),('4','Ven'),('5','Sab'),('6','Dom')] %}
-                        {% for day_value, day_label in weekday_labels %}
-                        <label class="btn btn-outline-secondary btn-sm">
-                            <input class="form-check-input me-1" type="checkbox" name="weekdays" value="{{ day_value }}">{{ day_label }}
-                        </label>
-                        {% endfor %}
-                    </div>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Canale di consegna</label>
-                    <select name="delivery_channel" id="delivery-channel" class="form-select">
-                        <option value="{{ delivery_email }}" {% if default_delivery_channel == delivery_email %}selected{% endif %}>Email</option>
-                        <option value="{{ delivery_telegram }}" {% if default_delivery_channel == delivery_telegram %}selected{% endif %}>Telegram</option>
-                    </select>
-                </div>
-                <div class="mb-3 d-none" id="telegram-handle-group">
-                    <label class="form-label">Handle Telegram</label>
-                    <input type="text" name="telegram_handle" class="form-control" placeholder="es. @mio_handle" value="{{ session_telegram_handle or '' }}">
-                    <small class="text-muted">Verrà salvato nel tuo profilo e usato per le prossime consegne Telegram.</small>
-                </div>
-                <div class="mb-4">
-                    <label class="form-label">Orario consegna (es. 07:30 o "dopo cena")</label>
-                    <input type="text" name="delivery_time" class="form-control" placeholder="07:30 oppure dopo cena">
-                </div>
-                <button type="submit" class="btn btn-primary w-100" {% if not books %}disabled{% endif %}>Imposta Programma</button>
-            </form>
+            {% else %}
+            <p class="text-muted mb-0">Nessun libro trovato con i filtri selezionati.</p>
+            {% endif %}
         </div>
     </div>
-
 </div>
-<script>
-    const frequencySelect = document.getElementById("frequency-type");
-    const frequencyDaysGroup = document.getElementById("frequency-days-group");
-    const weekdaysGroup = document.getElementById("weekdays-group");
-    const deliveryChannelSelect = document.getElementById("delivery-channel");
-    const telegramHandleGroup = document.getElementById("telegram-handle-group");
-    const bookSelect = document.getElementById("book-select");
-    const selectedBookCover = document.getElementById("selected-book-cover");
-
-    const updateFrequencyFields = () => {
-        const value = frequencySelect.value;
-        frequencyDaysGroup.classList.toggle("d-none", value !== "every_n_days");
-        weekdaysGroup.classList.toggle("d-none", value !== "weekdays");
-    };
-
-    const updateDeliveryFields = () => {
-        const value = deliveryChannelSelect.value;
-        telegramHandleGroup.classList.toggle("d-none", value !== "{{ delivery_telegram }}");
-    };
-
-    const updatePreview = () => {
-        if (!bookSelect || !bookSelect.selectedOptions.length) {
-            return;
-        }
-        const selected = bookSelect.selectedOptions[0];
-        const title = selected.dataset.title || "Titolo n/d";
-        const author = selected.dataset.author || "Autore n/d";
-        const year = selected.dataset.year || "Anno n/d";
-        const genre = selected.dataset.genre || "Genere n/d";
-        const language = selected.dataset.language || "Lingua n/d";
-        const description = selected.dataset.description || "Nessuna descrizione disponibile.";
-        const tags = selected.dataset.tags || "n/d";
-        const hours = selected.dataset.hours ? `${selected.dataset.hours} ore` : "Durata n/d";
-        const cover = selected.dataset.cover || "{{ url_for('static', filename='images/cover.png') }}";
-
-        document.getElementById("preview-title").textContent = title;
-        document.getElementById("preview-meta").textContent = `${author} · ${year} · ${genre} · ${language}`;
-        document.getElementById("preview-description").textContent = description;
-        document.getElementById("preview-tags").textContent = `Tag: ${tags}`;
-        document.getElementById("preview-hours").textContent = hours;
-
-        if (selectedBookCover) {
-            selectedBookCover.src = cover;
-            selectedBookCover.alt = `Copertina di ${title}`;
-        }
-    };
-
-    frequencySelect.addEventListener("change", updateFrequencyFields);
-    deliveryChannelSelect.addEventListener("change", updateDeliveryFields);
-
-    if (bookSelect) {
-        bookSelect.addEventListener("change", updatePreview);
-        updatePreview();
-    }
-
-    updateFrequencyFields();
-    updateDeliveryFields();
-</script>
 {% endblock %}

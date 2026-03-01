@@ -675,7 +675,7 @@ def delete_account():
     flash("Il tuo account è stato disiscritto e cancellato completamente.")
     return redirect(url_for("app_routes.index"))
 
-@app_routes.route("/select_book", methods=["GET", "POST"])
+@app_routes.route("/select_book")
 def select_book():
     if "user_id" not in session:
         flash("Devi effettuare il login per selezionare un libro.")
@@ -684,8 +684,64 @@ def select_book():
     user_id = session["user_id"]
     active_schedules = ReadingSchedule.query.options(joinedload(ReadingSchedule.book)).filter_by(user_id=user_id).all()
 
+    search_query = request.args.get("q", "").strip()
+    filter_author = request.args.get("author", "").strip()
+    filter_year = request.args.get("year", "").strip()
+    filter_genre = request.args.get("genre", "").strip()
+    filter_tags = request.args.get("tags", "").strip()
+    filter_language = request.args.get("language", "").strip()
+    filter_max_hours = request.args.get("max_hours", "").strip()
+
+    filters = _build_book_filters(
+        search_query,
+        filter_author,
+        filter_year,
+        filter_genre,
+        filter_tags,
+        filter_language,
+        filter_max_hours,
+        semantic_book_ids=semantic_book_index.search(search_query) if search_query else None,
+    )
+    books_query = Book.query
+    if filters:
+        books_query = books_query.filter(*filters)
+    books = books_query.order_by(Book.title.asc()).all()
+    dashboard = _build_dashboard(active_schedules)
+
+    return render_template(
+        "select_book.html",
+        books=books,
+        active_schedules=active_schedules,
+        dashboard=dashboard,
+        describe_frequency=describe_frequency,
+        describe_delivery_channel=describe_delivery_channel,
+        search_query=search_query,
+        filter_author=filter_author,
+        filter_year=filter_year,
+        filter_genre=filter_genre,
+        filter_tags=filter_tags,
+        filter_language=filter_language,
+        filter_max_hours=filter_max_hours,
+        normalize_tags=_normalize_tags,
+    )
+
+
+@app_routes.route("/configure_reading/<int:book_id>", methods=["GET", "POST"])
+def configure_reading(book_id):
+    if "user_id" not in session:
+        flash("Devi effettuare il login per selezionare un libro.")
+        return redirect(url_for("app_routes.login"))
+
+    user_id = session["user_id"]
+    selected_book = Book.query.get(book_id)
+    if not selected_book:
+        flash("Libro non trovato.")
+        return redirect(url_for("app_routes.select_book"))
+
+    active_schedules = ReadingSchedule.query.options(joinedload(ReadingSchedule.book)).filter_by(user_id=user_id).all()
+    current_user = User.query.get(user_id)
+
     if request.method == "POST":
-        book_id = request.form["book_id"]
         try:
             minutes_per_reading = _parse_int_form_field(
                 "minutes_per_reading",
@@ -707,26 +763,26 @@ def select_book():
             )
         except ValueError as error:
             flash(str(error))
-            return redirect(url_for("app_routes.select_book"))
+            return redirect(url_for("app_routes.configure_reading", book_id=book_id))
 
         frequency_type = request.form.get("frequency_type") or request.form.get("frequency_mode", FREQ_EVERY_N_DAYS)
         if frequency_type == "interval":
             frequency_type = FREQ_EVERY_N_DAYS
+
         delivery_time = parse_time_str(request.form.get("delivery_time"))
         weekdays_selected = request.form.getlist("weekdays") or request.form.getlist("frequency_weekdays")
-        current_user = User.query.get(user_id)
         default_channel = (current_user.preferred_delivery_channel if current_user else DELIVERY_EMAIL)
         delivery_channel = (request.form.get("delivery_channel") or default_channel).strip().lower()
         telegram_handle = (request.form.get("telegram_handle") or "").strip()
 
         if delivery_channel not in SUPPORTED_DELIVERY_CHANNELS:
             flash("Canale di consegna non valido.")
-            return redirect(url_for("app_routes.select_book"))
+            return redirect(url_for("app_routes.configure_reading", book_id=book_id))
 
         resolved_telegram_handle = telegram_handle or (current_user.telegram_handle if current_user else "")
         if delivery_channel == DELIVERY_TELEGRAM and not resolved_telegram_handle:
             flash("Inserisci il tuo handle Telegram per ricevere i pezzi su Telegram.")
-            return redirect(url_for("app_routes.select_book"))
+            return redirect(url_for("app_routes.configure_reading", book_id=book_id))
 
         if telegram_handle and current_user:
             current_user.telegram_handle = telegram_handle
@@ -734,20 +790,18 @@ def select_book():
         active_subscriptions = sum(1 for schedule in active_schedules if not schedule.is_paused)
         if active_subscriptions >= MAX_ACTIVE_SUBSCRIPTIONS:
             flash("Hai raggiunto il limite di 3 sottoscrizioni attive. Metti in pausa o cancella una sottoscrizione prima di aggiungerne un'altra.")
-            return redirect(url_for("app_routes.select_book"))
+            return redirect(url_for("app_routes.configure_reading", book_id=book_id))
 
         if frequency_type == FREQ_WEEKDAYS and not weekdays_selected:
             flash("Seleziona almeno un giorno della settimana.")
-            return redirect(url_for("app_routes.select_book"))
+            return redirect(url_for("app_routes.configure_reading", book_id=book_id))
 
         if frequency_type != FREQ_EVERY_N_DAYS:
             frequency_days = 1
 
         weekdays = None
         if frequency_type == FREQ_WEEKDAYS:
-            weekdays = serialize_weekdays(
-                [int(day) for day in weekdays_selected if day.isdigit()]
-            )
+            weekdays = serialize_weekdays([int(day) for day in weekdays_selected if day.isdigit()])
         elif frequency_type == FREQ_WEEKEND:
             weekdays = serialize_weekdays([5, 6])
 
@@ -763,7 +817,7 @@ def select_book():
 
         schedule = ReadingSchedule(
             user_id=user_id,
-            book_id=book_id,
+            book_id=selected_book.id,
             words_per_minute=words_per_minute,
             minutes_per_reading=minutes_per_reading,
             frequency_type=frequency_type,
@@ -777,58 +831,15 @@ def select_book():
         db.session.add(schedule)
         db.session.commit()
         flash("Programma di lettura impostato!")
-        return redirect(url_for("app_routes.select_book"))
-
-    search_query = request.args.get("q", "").strip()
-    filter_author = request.args.get("author", "").strip()
-    filter_year = request.args.get("year", "").strip()
-    filter_genre = request.args.get("genre", "").strip()
-    filter_tags = request.args.get("tags", "").strip()
-    filter_language = request.args.get("language", "").strip()
-    filter_max_hours = request.args.get("max_hours", "").strip()
-    selected_book_id = request.args.get("selected_book_id", type=int)
-
-    filters = _build_book_filters(
-        search_query,
-        filter_author,
-        filter_year,
-        filter_genre,
-        filter_tags,
-        filter_language,
-        filter_max_hours,
-        semantic_book_ids=semantic_book_index.search(search_query) if search_query else None,
-    )
-    books_query = Book.query
-    if filters:
-        books_query = books_query.filter(*filters)
-    books = books_query.order_by(Book.title.asc()).all()
-    selected_book = next((book for book in books if book.id == selected_book_id), None)
-    if not selected_book and books:
-        selected_book = books[0]
-
-    dashboard = _build_dashboard(active_schedules)
-    user = User.query.get(user_id)
+        return redirect(url_for("app_routes.reading_center"))
 
     return render_template(
-        "select_book.html",
-        books=books,
-        active_schedules=active_schedules,
-        dashboard=dashboard,
-        describe_frequency=describe_frequency,
-        describe_delivery_channel=describe_delivery_channel,
-        search_query=search_query,
-        filter_author=filter_author,
-        filter_year=filter_year,
-        filter_genre=filter_genre,
-        filter_tags=filter_tags,
-        filter_language=filter_language,
-        filter_max_hours=filter_max_hours,
+        "configure_reading.html",
         selected_book=selected_book,
-        normalize_tags=_normalize_tags,
         delivery_email=DELIVERY_EMAIL,
         delivery_telegram=DELIVERY_TELEGRAM,
-        session_telegram_handle=(user.telegram_handle if user else ""),
-        default_delivery_channel=(user.preferred_delivery_channel if user else DELIVERY_EMAIL),
+        session_telegram_handle=(current_user.telegram_handle if current_user else ""),
+        default_delivery_channel=(current_user.preferred_delivery_channel if current_user else DELIVERY_EMAIL),
     )
 
 
