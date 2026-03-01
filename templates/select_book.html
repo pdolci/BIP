@@ -57,12 +57,20 @@
             <div class="list-group">
                 {% for book in books %}
                 <div class="list-group-item d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
-                    <div>
-                        <h5 class="mb-1">{{ book.title }}</h5>
-                        <p class="mb-1 text-muted small">
-                            {{ book.author or 'Autore n/d' }} · {{ book.publication_year or 'Anno n/d' }} · {{ book.genre or 'Genere n/d' }} · {{ book.language or 'Lingua n/d' }}
-                        </p>
-                        <p class="mb-0 small">{{ book.short_description or 'Nessuna descrizione disponibile.' }}</p>
+                    <div class="d-flex align-items-start gap-3">
+                        <img
+                            class="selected-book-cover"
+                            src="{{ url_for('app_routes.book_cover', book_id=book.id) }}"
+                            alt="Copertina di {{ book.title }}"
+                            loading="lazy"
+                        >
+                        <div>
+                            <h5 class="mb-1">{{ book.title }}</h5>
+                            <p class="mb-1 text-muted small">
+                                {{ book.author or 'Autore n/d' }} · {{ book.publication_year or 'Anno n/d' }} · {{ book.genre or 'Genere n/d' }} · {{ book.language or 'Lingua n/d' }}
+                            </p>
+                            <p class="mb-0 small">{{ book.short_description or 'Nessuna descrizione disponibile.' }}</p>
+                        </div>
                     </div>
                     <div class="d-flex align-items-center gap-2">
                         {% if book.estimated_reading_hours %}
@@ -75,8 +83,10 @@
                 </div>
                 {% endfor %}
             </div>
-            {% else %}
+            {% elif has_active_filters %}
             <p class="text-muted mb-0">Nessun libro trovato con i filtri selezionati.</p>
+            {% else %}
+            <p class="text-muted mb-0">Inserisci almeno un filtro o una ricerca libera per visualizzare i libri.</p>
             {% endif %}
         </div>
     </div>
