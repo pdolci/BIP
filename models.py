@@ -60,8 +60,6 @@ class ReadingSchedule(db.Model):
     frequency_days = db.Column(db.Integer, nullable=False)
     frequency_type = db.Column(db.String(20), nullable=True)
     weekdays = db.Column(db.String(20), nullable=True)
-    frequency_mode = db.Column(db.String(20), nullable=False, default="interval")
-    frequency_weekdays = db.Column(db.String(20), nullable=True)
     delivery_time = db.Column(db.Time, nullable=True)
     next_send_date = db.Column(db.DateTime, nullable=False)
     is_paused = db.Column(db.Boolean, default=False) 

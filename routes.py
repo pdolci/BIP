@@ -768,8 +768,6 @@ def select_book():
             minutes_per_reading=minutes_per_reading,
             frequency_type=frequency_type,
             frequency_days=frequency_days,
-            frequency_mode=frequency_type,
-            frequency_weekdays=weekdays,
             weekdays=weekdays,
             delivery_time=delivery_time,
             next_send_date=local_naive_to_utc_naive(next_send_date),
