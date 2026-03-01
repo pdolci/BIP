@@ -1248,7 +1248,6 @@ def upload_book():
     tags = request.form.get("tags")
     language = request.form.get("language")
     estimated_reading_hours = request.form.get("estimated_reading_hours")
-    cover_image = (request.form.get("cover_image") or "").strip() or None
     cover_image_file = request.files.get("cover_image_file")
 
     if file and allowed_file(file.filename):
@@ -1296,7 +1295,7 @@ def upload_book():
             tags=tags,
             language=language,
             estimated_reading_hours=parsed_estimated_hours,
-            cover_image=f"covers/{cover_filename}" if cover_filename else cover_image,
+            cover_image=f"covers/{cover_filename}" if cover_filename else None,
             word_count=calculated_word_count,
         )
         build_and_store_book_embedding(new_book)
@@ -1343,7 +1342,6 @@ def edit_book(book_id):
     book.tags = (request.form.get("tags") or "").strip() or None
     book.language = (request.form.get("language") or "").strip() or None
     book.estimated_reading_hours = parsed_estimated_hours
-    cover_image = (request.form.get("cover_image") or "").strip() or None
     cover_image_file = request.files.get("cover_image_file")
     cover_filename = _store_cover_on_disk(cover_image_file) if cover_image_file and cover_image_file.filename else None
 
@@ -1354,9 +1352,6 @@ def edit_book(book_id):
     if cover_filename:
         _delete_local_cover_if_present(book.cover_image)
         book.cover_image = f"covers/{cover_filename}"
-    elif cover_image:
-        _delete_local_cover_if_present(book.cover_image)
-        book.cover_image = cover_image
 
     file_path = book.get_absolute_path()
     if os.path.exists(file_path):
