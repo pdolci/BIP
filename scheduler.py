@@ -87,7 +87,7 @@ def start_scheduler(app: Flask):
             check_scheduled_emails,
             "interval",
             minutes=1,
-            max_instances=3,
+            max_instances=1,
             id="check_scheduled_emails",
             args=[app],
         )
