@@ -342,22 +342,6 @@ def _is_schedule_completed(schedule, total_words=None):
     return schedule.last_sent_index >= total_words
 
 
-def _compute_streak(sent_events):
-    if not sent_events:
-        return 0
-
-    sent_days = sorted({utc_naive_to_local_naive(event.created_at).date() for event in sent_events}, reverse=True)
-    streak = 0
-    cursor = sent_days[0]
-    for day in sent_days:
-        if day == cursor:
-            streak += 1
-            cursor = cursor - timedelta(days=1)
-        elif day < cursor:
-            break
-    return streak
-
-
 def _build_dashboard(active_schedules):
     if not active_schedules:
         return None
@@ -365,7 +349,6 @@ def _build_dashboard(active_schedules):
     total_words = 0
     total_read = 0
     total_remaining_minutes = 0
-    sent_events = []
     history = []
 
     schedule_ids = [schedule.id for schedule in active_schedules]
@@ -394,7 +377,6 @@ def _build_dashboard(active_schedules):
         total_remaining_minutes += int(round(remaining_sessions * schedule.minutes_per_reading))
 
         schedule_events = events_by_schedule.get(schedule.id, [])
-        sent_events.extend([event for event in schedule_events if event.event_type == "sent"])
 
         for event in schedule_events:
             history.append({
@@ -413,7 +395,6 @@ def _build_dashboard(active_schedules):
         "completion": completion,
         "remaining_words": remaining_words,
         "remaining_minutes": total_remaining_minutes,
-        "streak_days": _compute_streak(sent_events),
         "history": history[:20],
     }
 
