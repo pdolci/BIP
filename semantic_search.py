@@ -6,7 +6,7 @@ import threading
 from typing import Iterable
 
 from sqlalchemy import inspect
-from sqlalchemy.exc import OperationalError
+from sqlalchemy.exc import NoInspectionAvailable, OperationalError
 
 try:
     import numpy as np
@@ -182,7 +182,27 @@ semantic_book_index = SemanticBookIndex()
 def initialize_semantic_search_index(db_session):
     from models import Book
 
-    inspector = inspect(db_session.bind)
+    bind = db_session.bind
+    if bind is None:
+        try:
+            bind = db_session.get_bind()
+        except Exception:  # pragma: no cover - defensive fallback for lazy/sessionless bootstrap
+            bind = None
+
+    if bind is None:
+        logging.warning(
+            "Indicizzazione semantica saltata: nessuna connessione database disponibile durante bootstrap."
+        )
+        return
+
+    try:
+        inspector = inspect(bind)
+    except NoInspectionAvailable:
+        logging.warning(
+            "Indicizzazione semantica saltata: bind database non ispezionabile durante bootstrap."
+        )
+        return
+
     column_names = {column["name"] for column in inspector.get_columns(Book.__tablename__)}
     if "embedding_vector" not in column_names:
         logging.warning(
