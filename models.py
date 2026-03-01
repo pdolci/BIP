@@ -39,6 +39,7 @@ class Book(db.Model):
     estimated_reading_hours = db.Column(db.Float, nullable=True)
     cover_image = db.Column(db.String(500), nullable=True)
     word_count = db.Column(db.Integer, nullable=False, default=0)
+    embedding_vector = db.Column(db.Text, nullable=True)
 
     def get_absolute_path(self):
         """Returns the absolute file path of the book."""

@@ -6,6 +6,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 from config import Config
 from extensions import csrf, db, limiter, mail, migrate
 from routes import app_routes
+from semantic_search import initialize_semantic_search_index
 
 
 def _register_rate_limit_handlers(app):
@@ -68,6 +69,10 @@ def create_app(config_class=Config):
 
     _register_rate_limit_handlers(app)
     _validate_startup_prerequisites(app)
+
+    with app.app_context():
+        initialize_semantic_search_index(db.session)
+
     return app
 
 
