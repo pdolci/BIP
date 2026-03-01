@@ -14,6 +14,7 @@ class User(db.Model):
     telegram_handle = db.Column(db.String(120), nullable=True)
     preferred_delivery_channel = db.Column(db.String(20), nullable=False, default="email")
     email_confirmed = db.Column(db.Boolean, nullable=False, default=False)
+    session_version = db.Column(db.Integer, nullable=False, default=0)
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
