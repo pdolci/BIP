@@ -1394,7 +1394,7 @@ def uploaded_cover(filename):
 def book_cover(book_id):
     book = Book.query.get_or_404(book_id)
     if not book.cover_image:
-        return redirect("https://images.unsplash.com/photo-1512820790803-83ca734da794?auto=format&fit=crop&w=800&q=80")
+        return redirect(url_for("static", filename="images/cover.png"))
 
     if book.cover_image.startswith("covers/"):
         cover_filename = book.cover_image.split("/", 1)[1]

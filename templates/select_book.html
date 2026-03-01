@@ -194,7 +194,7 @@
         const description = selected.dataset.description || "Nessuna descrizione disponibile.";
         const tags = selected.dataset.tags || "n/d";
         const hours = selected.dataset.hours ? `${selected.dataset.hours} ore` : "Durata n/d";
-        const cover = selected.dataset.cover || "https://images.unsplash.com/photo-1512820790803-83ca734da794?auto=format&fit=crop&w=800&q=80";
+        const cover = selected.dataset.cover || "{{ url_for('static', filename='images/cover.png') }}";
 
         document.getElementById("preview-title").textContent = title;
         document.getElementById("preview-meta").textContent = `${author} · ${year} · ${genre} · ${language}`;
