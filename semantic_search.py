@@ -5,6 +5,9 @@ import re
 import threading
 from typing import Iterable
 
+from sqlalchemy import inspect
+from sqlalchemy.exc import OperationalError
+
 try:
     import numpy as np
 except ImportError:  # pragma: no cover - optional dependency
@@ -179,6 +182,24 @@ semantic_book_index = SemanticBookIndex()
 def initialize_semantic_search_index(db_session):
     from models import Book
 
-    books = Book.query.all()
+    inspector = inspect(db_session.bind)
+    column_names = {column["name"] for column in inspector.get_columns(Book.__tablename__)}
+    if "embedding_vector" not in column_names:
+        logging.warning(
+            "Indicizzazione semantica saltata: colonna '%s.embedding_vector' non ancora presente.",
+            Book.__tablename__,
+        )
+        return
+
+    try:
+        books = Book.query.all()
+    except OperationalError:
+        logging.warning(
+            "Indicizzazione semantica saltata: schema database non pronto durante bootstrap.",
+            exc_info=True,
+        )
+        db_session.rollback()
+        return
+
     semantic_book_index.rebuild(books)
     db_session.commit()
