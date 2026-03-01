@@ -692,7 +692,7 @@ def select_book():
     filter_language = request.args.get("language", "").strip()
     filter_max_hours = request.args.get("max_hours", "").strip()
 
-    filters = _build_book_filters(
+    has_active_filters = any([
         search_query,
         filter_author,
         filter_year,
@@ -700,12 +700,25 @@ def select_book():
         filter_tags,
         filter_language,
         filter_max_hours,
-        semantic_book_ids=semantic_book_index.search(search_query) if search_query else None,
-    )
-    books_query = Book.query
-    if filters:
-        books_query = books_query.filter(*filters)
-    books = books_query.order_by(Book.title.asc()).all()
+    ])
+
+    books = []
+    if has_active_filters:
+        filters = _build_book_filters(
+            search_query,
+            filter_author,
+            filter_year,
+            filter_genre,
+            filter_tags,
+            filter_language,
+            filter_max_hours,
+            semantic_book_ids=semantic_book_index.search(search_query) if search_query else None,
+        )
+        books_query = Book.query
+        if filters:
+            books_query = books_query.filter(*filters)
+        books = books_query.order_by(Book.title.asc()).all()
+
     dashboard = _build_dashboard(active_schedules)
 
     return render_template(
@@ -722,6 +735,7 @@ def select_book():
         filter_tags=filter_tags,
         filter_language=filter_language,
         filter_max_hours=filter_max_hours,
+        has_active_filters=has_active_filters,
         normalize_tags=_normalize_tags,
     )
 
