@@ -32,6 +32,9 @@ from .core import (
 )
 
 
+MAX_TRAVEL_DAYS = 365
+
+
 @app_routes.route("/select_book")
 def select_book():
     if "user_id" not in session:
@@ -375,9 +378,14 @@ def travel_mode_schedule(schedule_id):
         flash("Operazione non consentita.")
         return redirect(url_for("app_routes.select_book"))
 
-    travel_days = int(request.form.get("travel_days", 0) or 0)
-    if travel_days <= 0:
+    try:
+        travel_days = int(request.form.get("travel_days", 0) or 0)
+    except (TypeError, ValueError):
         flash("Inserisci un numero di giorni valido per la modalità viaggio.")
+        return redirect(url_for("app_routes.select_book"))
+
+    if travel_days <= 0 or travel_days > MAX_TRAVEL_DAYS:
+        flash(f"I giorni di modalità viaggio devono essere compresi tra 1 e {MAX_TRAVEL_DAYS}.")
         return redirect(url_for("app_routes.select_book"))
 
     schedule.travel_pause_until = utc_now_naive() + timedelta(days=travel_days)
