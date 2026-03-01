@@ -12,6 +12,7 @@ from . import app_routes
 from .core import (
     DUMMY_PASSWORD_HASH,
     SESSION_LAST_ACTIVITY_KEY,
+    SESSION_VERSION_KEY,
     _client_ip_address,
     _is_valid_email,
     _password_requirements_message,
@@ -86,6 +87,7 @@ def login():
             session["is_content_manager"] = user.is_content_manager
             session.permanent = True
             session[SESSION_LAST_ACTIVITY_KEY] = utc_now_timestamp()
+            session[SESSION_VERSION_KEY] = user.session_version
             flash("Login riuscito!")
             return redirect(url_for("app_routes.index"))
 
@@ -180,6 +182,7 @@ def reset_password(token):
             return redirect(url_for("app_routes.reset_password", token=token))
 
         user.set_password(password)
+        user.session_version += 1
         db.session.commit()
         flash("Password aggiornata con successo! Ora puoi accedere.")
         return redirect(url_for("app_routes.login"))
@@ -189,9 +192,17 @@ def reset_password(token):
 
 @app_routes.route("/logout")
 def logout():
+    user_id = session.get("user_id")
+    if user_id:
+        user = User.query.get(user_id)
+        if user:
+            user.session_version += 1
+            db.session.commit()
+
     session.pop("user_id", None)
     session.pop("is_admin", None)
     session.pop("is_content_manager", None)
     session.pop(SESSION_LAST_ACTIVITY_KEY, None)
+    session.pop(SESSION_VERSION_KEY, None)
     flash("Logout effettuato!")
     return redirect(url_for("app_routes.index"))

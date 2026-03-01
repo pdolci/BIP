@@ -4,7 +4,9 @@ from config import Config
 from time_utils import utc_now_timestamp
 
 from . import app_routes
-from .core import SESSION_LAST_ACTIVITY_KEY
+from models import User
+
+from .core import SESSION_LAST_ACTIVITY_KEY, SESSION_VERSION_KEY
 
 
 @app_routes.before_app_request
@@ -16,6 +18,18 @@ def enforce_session_inactivity_timeout():
     endpoint = request.endpoint or ""
     if endpoint in {"app_routes.login", "app_routes.logout", "static"}:
         return None
+
+    user = User.query.get(user_id)
+    if not user:
+        session.clear()
+        flash("Sessione non valida. Effettua nuovamente il login.")
+        return redirect(url_for("app_routes.login"))
+
+    session_version = session.get(SESSION_VERSION_KEY)
+    if session_version != user.session_version:
+        session.clear()
+        flash("Sessione revocata. Effettua nuovamente il login.")
+        return redirect(url_for("app_routes.login"))
 
     timeout_seconds = max(Config.SESSION_INACTIVITY_MINUTES, 1) * 60
     now_ts = utc_now_timestamp()

@@ -30,6 +30,7 @@ ORIGIN_QUOTES_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), "O
 EMAIL_REGEX = re.compile(r"^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$", re.IGNORECASE)
 PASSWORD_ALLOWED_SYMBOLS = "!£$%&^"
 SESSION_LAST_ACTIVITY_KEY = "last_activity_ts"
+SESSION_VERSION_KEY = "session_version"
 DUMMY_PASSWORD_HASH = generate_password_hash("dummy-password-for-login")
 
 
