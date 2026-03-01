@@ -128,7 +128,8 @@ def forgot_password():
         email = (request.form.get("email") or "").strip()
         user = User.query.filter_by(email=email).first()
         if user:
-            token = get_reset_token_serializer().dumps(user.email, salt="password-reset")
+            token_payload = {"email": user.email, "password_hash": user.password_hash}
+            token = get_reset_token_serializer().dumps(token_payload, salt="password-reset")
             reset_url = url_for("app_routes.reset_password", token=token, _external=True)
             send_password_reset_email(user.email, reset_url)
 
@@ -141,14 +142,29 @@ def forgot_password():
 @app_routes.route("/reset_password/<token>", methods=["GET", "POST"])
 def reset_password(token):
     try:
-        email = get_reset_token_serializer().loads(token, salt="password-reset", max_age=3600)
+        token_data = get_reset_token_serializer().loads(token, salt="password-reset", max_age=3600)
     except (SignatureExpired, BadSignature):
+        flash("Link di recupero non valido o scaduto.")
+        return redirect(url_for("app_routes.forgot_password"))
+
+    if isinstance(token_data, str):
+        email = token_data
+        password_hash = None
+    else:
+        email = token_data.get("email")
+        password_hash = token_data.get("password_hash")
+
+    if not email:
         flash("Link di recupero non valido o scaduto.")
         return redirect(url_for("app_routes.forgot_password"))
 
     user = User.query.filter_by(email=email).first()
     if not user:
         flash("Utente non trovato.")
+        return redirect(url_for("app_routes.forgot_password"))
+
+    if password_hash is not None and password_hash != user.password_hash:
+        flash("Link di recupero non valido o già utilizzato.")
         return redirect(url_for("app_routes.forgot_password"))
 
     if request.method == "POST":
