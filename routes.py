@@ -42,6 +42,7 @@ from time_utils import (
     compute_next_send_utc,
 )
 from html_processing import sanitize_uploaded_html
+from semantic_search import build_and_store_book_embedding, semantic_book_index
 
 UPLOAD_FOLDER = Config.UPLOAD_FOLDER
 COVER_UPLOAD_FOLDER = Config.COVER_UPLOAD_FOLDER
@@ -232,7 +233,7 @@ def _delete_local_cover_if_present(cover_image):
     if os.path.exists(local_path):
         os.remove(local_path)
 
-def _build_book_filters(search_query, author, year, genre, tags, language, max_hours):
+def _build_book_filters(search_query, author, year, genre, tags, language, max_hours, semantic_book_ids=None):
     filters = []
     normalized_query = (search_query or "").strip().lower()
     tags_tokens = [token.strip() for token in (tags or "").split(",") if token.strip()]
@@ -264,18 +265,7 @@ def _build_book_filters(search_query, author, year, genre, tags, language, max_h
             Book.language.ilike(f"%{normalized_query}%"),
         )
 
-        semantic_match = None
-        if "classici russi" in normalized_query:
-            semantic_match = and_(
-                or_(Book.genre.ilike("%classico%"), Book.tags.ilike("%classici%")),
-                or_(Book.tags.ilike("%russi%"), Book.language.ilike("%russo%")),
-            )
-        elif "saggi brevi" in normalized_query:
-            semantic_match = and_(
-                or_(Book.genre.ilike("%saggio%"), Book.tags.ilike("%saggi%")),
-                Book.estimated_reading_hours <= 5,
-            )
-
+        semantic_match = Book.id.in_(semantic_book_ids) if semantic_book_ids else None
         filters.append(or_(text_match, semantic_match) if semantic_match is not None else text_match)
 
         hours_match = re.search(r"<\s*(\d+(?:[\.,]\d+)?)\s*ore", normalized_query)
@@ -808,6 +798,7 @@ def select_book():
         filter_tags,
         filter_language,
         filter_max_hours,
+        semantic_book_ids=semantic_book_index.search(search_query) if search_query else None,
     )
     books_query = Book.query
     if filters:
@@ -1308,8 +1299,10 @@ def upload_book():
             cover_image=f"covers/{cover_filename}" if cover_filename else cover_image,
             word_count=calculated_word_count,
         )
+        build_and_store_book_embedding(new_book)
         db.session.add(new_book)
         db.session.commit()
+        semantic_book_index.upsert(new_book)
         flash("Libro caricato con successo!")
     else:
         flash("Formato non supportato. Carica file .txt, .html o .htm.")
@@ -1369,7 +1362,10 @@ def edit_book(book_id):
     if os.path.exists(file_path):
         book.word_count = count_total_words(file_path)
 
+    build_and_store_book_embedding(book)
+
     db.session.commit()
+    semantic_book_index.upsert(book)
     flash("Libro aggiornato con successo!")
     return redirect(url_for("app_routes.manage_books"))
 
@@ -1415,6 +1411,7 @@ def delete_book(book_id):
     book = Book.query.get(book_id)
     if book:
         try:
+            semantic_book_index.remove(book.id)
             db.session.delete(book)
             db.session.commit()
             flash("Libro eliminato!")
