@@ -1,6 +1,7 @@
 import os
 
 from flask import Flask, flash, redirect, request, url_for
+from limits.storage import storage_from_string
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 from config import Config
@@ -45,6 +46,41 @@ def _validate_startup_prerequisites(app):
     )
 
 
+def _configure_rate_limiter_storage(app):
+    if not app.config.get("RATELIMIT_BACKEND_HEALTHCHECK_ENABLED", True):
+        return
+
+    storage_uri = app.config.get("RATELIMIT_STORAGE_URI")
+    if not storage_uri:
+        raise RuntimeError("RATE_LIMIT_STORAGE_URI non configurato.")
+
+    try:
+        storage = storage_from_string(storage_uri)
+    except Exception as exc:  # pragma: no cover - external backend parsing
+        message = f"Configurazione rate limit non valida ({storage_uri}): {exc}"
+        if app.config.get("RATELIMIT_FAIL_ON_BACKEND_ERROR", True):
+            raise RuntimeError(message) from exc
+
+        fallback_uri = app.config.get("RATELIMIT_STORAGE_FALLBACK_URI", "memory://")
+        app.logger.warning("%s. Fallback su %s.", message, fallback_uri)
+        app.config["RATELIMIT_STORAGE_URI"] = fallback_uri
+        return
+
+    if storage.check():
+        return
+
+    message = (
+        "Backend rate limit non raggiungibile "
+        f"({storage_uri}). Il rate limit di login/forgot_password sarebbe inattivo."
+    )
+    if app.config.get("RATELIMIT_FAIL_ON_BACKEND_ERROR", True):
+        raise RuntimeError(message)
+
+    fallback_uri = app.config.get("RATELIMIT_STORAGE_FALLBACK_URI", "memory://")
+    app.logger.warning("%s Fallback su %s.", message, fallback_uri)
+    app.config["RATELIMIT_STORAGE_URI"] = fallback_uri
+
+
 def create_app(config_class=Config):
     app = Flask(__name__)
     app.config.from_object(config_class)
@@ -52,6 +88,7 @@ def create_app(config_class=Config):
     db.init_app(app)
     mail.init_app(app)
     migrate.init_app(app, db)
+    _configure_rate_limiter_storage(app)
     limiter.init_app(app)
     csrf.init_app(app)
 
