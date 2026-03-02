@@ -133,7 +133,11 @@ def configure_reading(book_id):
         if frequency_type == "interval":
             frequency_type = FREQ_EVERY_N_DAYS
 
-        delivery_time = parse_time_str(request.form.get("delivery_time"))
+        raw_delivery_time = (request.form.get("delivery_time") or "").strip()
+        delivery_time = parse_time_str(raw_delivery_time)
+        if raw_delivery_time and delivery_time is None:
+            flash("Orario di consegna non valido. Usa un formato come 07:30 o un valore come 'dopo cena'.")
+            return redirect(url_for("app_routes.configure_reading", book_id=book_id))
         weekdays_selected = request.form.getlist("weekdays") or request.form.getlist("frequency_weekdays")
         default_channel = (current_user.preferred_delivery_channel if current_user else DELIVERY_EMAIL)
         delivery_channel = (request.form.get("delivery_channel") or default_channel).strip().lower()
@@ -286,7 +290,12 @@ def travel_mode(schedule_id):
         flash("Data di ripartenza non valida.")
         return redirect(url_for("app_routes.select_book"))
 
-    resume_time = parse_time_str(resume_time_raw) or schedule.delivery_time or time(9, 0)
+    parsed_resume_time = parse_time_str(resume_time_raw) if resume_time_raw else None
+    if resume_time_raw and parsed_resume_time is None:
+        flash("Orario di ripartenza non valido. Usa un formato come 07:30.")
+        return redirect(url_for("app_routes.select_book"))
+
+    resume_time = parsed_resume_time or schedule.delivery_time or time(9, 0)
     resume_at = local_naive_to_utc_naive(datetime.combine(resume_date, resume_time))
 
     if resume_at <= utc_now_naive():
