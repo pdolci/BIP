@@ -51,6 +51,7 @@ def select_book():
     filter_tags = request.args.get("tags", "").strip()
     filter_language = request.args.get("language", "").strip()
     filter_max_hours = request.args.get("max_hours", "").strip()
+    selected_book_id = request.args.get("selected_book_id", type=int)
 
     has_active_filters = any([
         search_query,
@@ -60,10 +61,14 @@ def select_book():
         filter_tags,
         filter_language,
         filter_max_hours,
+        selected_book_id,
     ])
 
     books = []
-    if has_active_filters:
+    if selected_book_id:
+        selected_book = Book.query.filter_by(id=selected_book_id, is_active=True).first()
+        books = [selected_book] if selected_book else []
+    elif has_active_filters:
         filters = _build_book_filters(
             search_query,
             filter_author,
