@@ -1,4 +1,5 @@
 import datetime
+import re
 
 FREQ_EVERY_N_DAYS = "every_n_days"
 FREQ_DAILY = "daily"
@@ -39,8 +40,38 @@ def serialize_weekdays(days):
 def parse_time_str(value):
     if not value:
         return None
+    normalized = value.strip().lower()
+    if not normalized:
+        return None
+
+    named_slots = {
+        "mattina": datetime.time(8, 0),
+        "mezzogiorno": datetime.time(12, 0),
+        "pranzo": datetime.time(13, 0),
+        "pomeriggio": datetime.time(16, 0),
+        "sera": datetime.time(20, 0),
+        "dopo cena": datetime.time(21, 0),
+        "notte": datetime.time(22, 30),
+    }
+    if normalized in named_slots:
+        return named_slots[normalized]
+
+    compact_match = re.fullmatch(r"(\d{1,2})[:.h](\d{2})", normalized)
+    if compact_match:
+        hours, minutes = map(int, compact_match.groups())
+        if 0 <= hours <= 23 and 0 <= minutes <= 59:
+            return datetime.time(hours, minutes)
+
+    hhmm_match = re.fullmatch(r"(\d{3,4})", normalized)
+    if hhmm_match:
+        digits = hhmm_match.group(1).zfill(4)
+        hours = int(digits[:2])
+        minutes = int(digits[2:])
+        if 0 <= hours <= 23 and 0 <= minutes <= 59:
+            return datetime.time(hours, minutes)
+
     try:
-        return datetime.time.fromisoformat(value)
+        return datetime.time.fromisoformat(normalized)
     except ValueError:
         return None
 
