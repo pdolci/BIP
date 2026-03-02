@@ -18,7 +18,7 @@
                     <h6 class="fw-bold mb-2"><i class="bi bi-lightning-charge me-1"></i>Inizia subito</h6>
                     <p class="small text-muted mb-3">Configura il tuo prossimo libro in meno di un minuto.</p>
                     {% if 'user_id' in session %}
-                        <a class="btn btn-primary w-100" href="{{ url_for('app_routes.select_book') }}">Vai ai miei libri</a>
+                        <a class="btn btn-primary w-100" href="{{ url_for('app_routes.select_book') }}">Vai a Ricerca</a>
                     {% else %}
                         <a class="btn btn-primary w-100" href="{{ url_for('app_routes.register') }}">Crea un account</a>
                     {% endif %}
@@ -59,7 +59,7 @@
         <h1 class="h3 mb-2">Leggi ogni giorno, con semplicità.</h1>
         <p class="mb-3">Scegli un libro, imposta il ritmo e ricevi contenuti pronti via email.</p>
         {% if 'user_id' in session %}
-            <a class="btn btn-primary w-100 mb-2" href="{{ url_for('app_routes.select_book') }}">I miei libri</a>
+            <a class="btn btn-primary w-100 mb-2" href="{{ url_for('app_routes.select_book') }}">Ricerca</a>
         {% else %}
             <a class="btn btn-primary w-100 mb-2" href="{{ url_for('app_routes.register') }}">Crea account</a>
         {% endif %}
@@ -108,7 +108,7 @@
                 <a
                     class="book-card-link text-decoration-none"
                     href="{{ url_for('app_routes.select_book', selected_book_id=book.id) }}"
-                    aria-label="Apri {{ book.title }} in I miei libri"
+                    aria-label="Apri {{ book.title }} in Ricerca"
                 >
                     <div class="card book-card h-100">
                         <img src="{{ url_for('app_routes.book_cover', book_id=book.id) }}" alt="{{ book.title }}" class="card-img-top">
