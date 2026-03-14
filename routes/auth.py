@@ -194,7 +194,7 @@ def reset_password(token):
 def logout():
     user_id = session.get("user_id")
     if user_id:
-        user = User.query.get(user_id)
+        user = db.session.get(User, user_id)
         if user:
             user.session_version += 1
             db.session.commit()

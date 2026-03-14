@@ -29,6 +29,7 @@ from .core import (
     describe_delivery_channel,
     describe_frequency,
     format_app_datetime,
+    require_login,
 )
 
 
@@ -36,11 +37,8 @@ MAX_TRAVEL_DAYS = 365
 
 
 @app_routes.route("/select_book")
+@require_login
 def select_book():
-    if "user_id" not in session:
-        flash("Devi effettuare il login per selezionare un libro.")
-        return redirect(url_for("app_routes.login"))
-
     user_id = session["user_id"]
     active_schedules = ReadingSchedule.query.options(joinedload(ReadingSchedule.book)).filter_by(user_id=user_id).all()
 
@@ -106,19 +104,16 @@ def select_book():
 
 
 @app_routes.route("/configure_reading/<int:book_id>", methods=["GET", "POST"])
+@require_login
 def configure_reading(book_id):
-    if "user_id" not in session:
-        flash("Devi effettuare il login per selezionare un libro.")
-        return redirect(url_for("app_routes.login"))
-
     user_id = session["user_id"]
-    selected_book = Book.query.get(book_id)
+    selected_book = db.session.get(Book, book_id)
     if not selected_book:
         flash("Libro non trovato.")
         return redirect(url_for("app_routes.select_book"))
 
     active_schedules = ReadingSchedule.query.options(joinedload(ReadingSchedule.book)).filter_by(user_id=user_id).all()
-    current_user = User.query.get(user_id)
+    current_user = db.session.get(User, user_id)
 
     if request.method == "POST":
         try:
@@ -211,13 +206,21 @@ def configure_reading(book_id):
 
 
 @app_routes.route("/reading_center")
+@require_login
 def reading_center():
-    if "user_id" not in session:
-        flash("Devi effettuare il login per accedere al centro di controllo lettura.")
-        return redirect(url_for("app_routes.login"))
-
     active_schedules = ReadingSchedule.query.options(joinedload(ReadingSchedule.book)).filter_by(user_id=session["user_id"]).all()
     dashboard = _build_dashboard(active_schedules)
+
+    schedule_infos = {}
+    for schedule in active_schedules:
+        total = schedule.book.word_count or 0
+        read = min(schedule.last_sent_index, total) if total else schedule.last_sent_index
+        pct = int(round(read / total * 100)) if total else 0
+        words_next = schedule.words_per_minute * schedule.minutes_per_reading
+        schedule_infos[schedule.id] = {
+            "completion_pct": pct,
+            "words_next": words_next,
+        }
 
     return render_template(
         "reading_center.html",
@@ -226,16 +229,14 @@ def reading_center():
         describe_frequency=describe_frequency,
         describe_delivery_channel=describe_delivery_channel,
         format_app_datetime=format_app_datetime,
+        schedule_infos=schedule_infos,
     )
 
 
 @app_routes.route("/snooze_schedule/<int:schedule_id>", methods=["POST"])
+@require_login
 def snooze_schedule(schedule_id):
-    if "user_id" not in session:
-        flash("Devi effettuare il login per modificare la tua sottoscrizione.")
-        return redirect(url_for("app_routes.login"))
-
-    schedule = ReadingSchedule.query.get(schedule_id)
+    schedule = db.session.get(ReadingSchedule, schedule_id)
     if not schedule or schedule.user_id != session["user_id"]:
         flash("Operazione non consentita.")
         return redirect(url_for("app_routes.select_book"))
@@ -261,12 +262,9 @@ def snooze_schedule(schedule_id):
 
 
 @app_routes.route("/travel_mode/<int:schedule_id>", methods=["POST"])
+@require_login
 def travel_mode(schedule_id):
-    if "user_id" not in session:
-        flash("Devi effettuare il login per modificare la tua sottoscrizione.")
-        return redirect(url_for("app_routes.login"))
-
-    schedule = ReadingSchedule.query.get(schedule_id)
+    schedule = db.session.get(ReadingSchedule, schedule_id)
     if not schedule or schedule.user_id != session["user_id"]:
         flash("Operazione non consentita.")
         return redirect(url_for("app_routes.select_book"))
@@ -312,12 +310,9 @@ def travel_mode(schedule_id):
 
 
 @app_routes.route("/pause_schedule/<int:schedule_id>", methods=["POST"])
+@require_login
 def pause_schedule(schedule_id):
-    if "user_id" not in session:
-        flash("Devi effettuare il login per modificare la tua sottoscrizione.")
-        return redirect(url_for("app_routes.login"))
-
-    schedule = ReadingSchedule.query.get(schedule_id)
+    schedule = db.session.get(ReadingSchedule, schedule_id)
     if schedule and schedule.user_id == session["user_id"]:
         schedule.is_paused = not schedule.is_paused
         db.session.add(DeliveryEvent(
@@ -335,12 +330,9 @@ def pause_schedule(schedule_id):
 
 
 @app_routes.route("/snooze_next_schedule/<int:schedule_id>", methods=["POST"])
+@require_login
 def snooze_next_schedule(schedule_id):
-    if "user_id" not in session:
-        flash("Devi effettuare il login per modificare la tua sottoscrizione.")
-        return redirect(url_for("app_routes.login"))
-
-    schedule = ReadingSchedule.query.get(schedule_id)
+    schedule = db.session.get(ReadingSchedule, schedule_id)
     if not schedule or schedule.user_id != session["user_id"]:
         flash("Operazione non consentita.")
         return redirect(url_for("app_routes.select_book"))
@@ -359,12 +351,9 @@ def snooze_next_schedule(schedule_id):
 
 
 @app_routes.route("/snooze_24h_schedule/<int:schedule_id>", methods=["POST"])
+@require_login
 def snooze_24h_schedule(schedule_id):
-    if "user_id" not in session:
-        flash("Devi effettuare il login per modificare la tua sottoscrizione.")
-        return redirect(url_for("app_routes.login"))
-
-    schedule = ReadingSchedule.query.get(schedule_id)
+    schedule = db.session.get(ReadingSchedule, schedule_id)
     if not schedule or schedule.user_id != session["user_id"]:
         flash("Operazione non consentita.")
         return redirect(url_for("app_routes.select_book"))
@@ -382,12 +371,9 @@ def snooze_24h_schedule(schedule_id):
 
 
 @app_routes.route("/travel_mode_schedule/<int:schedule_id>", methods=["POST"])
+@require_login
 def travel_mode_schedule(schedule_id):
-    if "user_id" not in session:
-        flash("Devi effettuare il login per modificare la tua sottoscrizione.")
-        return redirect(url_for("app_routes.login"))
-
-    schedule = ReadingSchedule.query.get(schedule_id)
+    schedule = db.session.get(ReadingSchedule, schedule_id)
     if not schedule or schedule.user_id != session["user_id"]:
         flash("Operazione non consentita.")
         return redirect(url_for("app_routes.select_book"))
@@ -417,12 +403,9 @@ def travel_mode_schedule(schedule_id):
 
 
 @app_routes.route("/delete_schedule/<int:schedule_id>", methods=["POST"])
+@require_login
 def delete_schedule(schedule_id):
-    if "user_id" not in session:
-        flash("Devi effettuare il login per cancellare la tua sottoscrizione.")
-        return redirect(url_for("app_routes.login"))
-
-    schedule = ReadingSchedule.query.get(schedule_id)
+    schedule = db.session.get(ReadingSchedule, schedule_id)
     if schedule and schedule.user_id == session["user_id"]:
         DeliveryEvent.query.filter_by(schedule_id=schedule.id).delete(synchronize_session=False)
         db.session.delete(schedule)

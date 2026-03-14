@@ -13,31 +13,42 @@ from .core import (
     describe_delivery_channel,
     describe_frequency,
     format_app_datetime,
-    has_admin_access,
-    is_logged_in,
+    require_admin,
 )
+
+ADMIN_PAGE_SIZE = 20
 
 
 @app_routes.route("/admin/maintenance")
+@require_admin
 def admin_maintenance():
-    if not is_logged_in() or not has_admin_access():
-        flash("Accesso negato!")
-        return redirect(url_for("app_routes.index"))
-
-    users = User.query.options(joinedload(User.schedules).joinedload(ReadingSchedule.book)).order_by(User.created_at.desc()).all()
+    page = request.args.get("page", 1, type=int)
+    users_page = (
+        User.query
+        .options(joinedload(User.schedules).joinedload(ReadingSchedule.book))
+        .order_by(User.created_at.desc())
+        .paginate(page=page, per_page=ADMIN_PAGE_SIZE, error_out=False)
+    )
+    users = users_page.items
     all_schedules = [schedule for user in users for schedule in user.schedules]
     now = utc_now_naive()
     due_schedules = [s for s in all_schedules if not s.is_paused and s.next_send_date and s.next_send_date <= now]
     paused_schedules = [s for s in all_schedules if s.is_paused]
 
+    total_users = User.query.count()
+    total_schedules = ReadingSchedule.query.count()
+    total_active = ReadingSchedule.query.filter_by(is_paused=False).count()
+    total_paused = total_schedules - total_active
+
     return render_template(
         "admin_maintenance.html",
         users=users,
+        users_page=users_page,
         now=now,
-        total_users=len(users),
-        total_schedules=len(all_schedules),
-        active_schedules=len(all_schedules) - len(paused_schedules),
-        paused_schedules=len(paused_schedules),
+        total_users=total_users,
+        total_schedules=total_schedules,
+        active_schedules=total_active,
+        paused_schedules=total_paused,
         due_schedules=len(due_schedules),
         describe_frequency=describe_frequency,
         describe_delivery_channel=describe_delivery_channel,
@@ -46,12 +57,9 @@ def admin_maintenance():
 
 
 @app_routes.route("/admin/schedule/toggle-pause/<int:schedule_id>", methods=["POST"])
+@require_admin
 def admin_toggle_pause_schedule(schedule_id):
-    if not is_logged_in() or not has_admin_access():
-        flash("Accesso negato!")
-        return redirect(url_for("app_routes.index"))
-
-    schedule = ReadingSchedule.query.get(schedule_id)
+    schedule = db.session.get(ReadingSchedule, schedule_id)
     if not schedule:
         flash("Schedulazione non trovata.")
         return redirect(url_for("app_routes.admin_maintenance"))
@@ -63,12 +71,9 @@ def admin_toggle_pause_schedule(schedule_id):
 
 
 @app_routes.route("/admin/schedule/recompute/<int:schedule_id>", methods=["POST"])
+@require_admin
 def admin_recompute_schedule(schedule_id):
-    if not is_logged_in() or not has_admin_access():
-        flash("Accesso negato!")
-        return redirect(url_for("app_routes.index"))
-
-    schedule = ReadingSchedule.query.get(schedule_id)
+    schedule = db.session.get(ReadingSchedule, schedule_id)
     if not schedule:
         flash("Schedulazione non trovata.")
         return redirect(url_for("app_routes.admin_maintenance"))
@@ -81,12 +86,9 @@ def admin_recompute_schedule(schedule_id):
 
 
 @app_routes.route("/admin/schedule/reset-progress/<int:schedule_id>", methods=["POST"])
+@require_admin
 def admin_reset_schedule_progress(schedule_id):
-    if not is_logged_in() or not has_admin_access():
-        flash("Accesso negato!")
-        return redirect(url_for("app_routes.index"))
-
-    schedule = ReadingSchedule.query.get(schedule_id)
+    schedule = db.session.get(ReadingSchedule, schedule_id)
     if not schedule:
         flash("Schedulazione non trovata.")
         return redirect(url_for("app_routes.admin_maintenance"))
@@ -102,12 +104,9 @@ def admin_reset_schedule_progress(schedule_id):
 
 
 @app_routes.route("/admin/user/reset-password/<int:user_id>", methods=["POST"])
+@require_admin
 def admin_reset_user_password(user_id):
-    if not is_logged_in() or not has_admin_access():
-        flash("Accesso negato!")
-        return redirect(url_for("app_routes.index"))
-
-    user = User.query.get(user_id)
+    user = db.session.get(User, user_id)
     if not user:
         flash("Utente non trovato.")
         return redirect(url_for("app_routes.admin_maintenance"))
@@ -128,16 +127,13 @@ def admin_reset_user_password(user_id):
 
 
 @app_routes.route("/admin/user/delete/<int:user_id>", methods=["POST"])
+@require_admin
 def admin_delete_user(user_id):
-    if not is_logged_in() or not has_admin_access():
-        flash("Accesso negato!")
-        return redirect(url_for("app_routes.index"))
-
     if session.get("user_id") == user_id:
         flash("Non puoi cancellare il tuo account amministratore da questa schermata.")
         return redirect(url_for("app_routes.admin_maintenance"))
 
-    user = User.query.get(user_id)
+    user = db.session.get(User, user_id)
     if not user:
         flash("Utente non trovato.")
         return redirect(url_for("app_routes.admin_maintenance"))

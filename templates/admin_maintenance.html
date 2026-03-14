@@ -135,6 +135,32 @@
                     </tbody>
                 </table>
             </div>
+            {% if users_page.pages > 1 %}
+            <nav class="mt-3">
+                <ul class="pagination pagination-sm justify-content-center mb-0">
+                    {% if users_page.has_prev %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('app_routes.admin_maintenance', page=users_page.prev_num) }}">‹ Prec</a>
+                    </li>
+                    {% endif %}
+                    {% for p in users_page.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+                        {% if p %}
+                        <li class="page-item {% if p == users_page.page %}active{% endif %}">
+                            <a class="page-link" href="{{ url_for('app_routes.admin_maintenance', page=p) }}">{{ p }}</a>
+                        </li>
+                        {% else %}
+                        <li class="page-item disabled"><span class="page-link">…</span></li>
+                        {% endif %}
+                    {% endfor %}
+                    {% if users_page.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('app_routes.admin_maintenance', page=users_page.next_num) }}">Succ ›</a>
+                    </li>
+                    {% endif %}
+                </ul>
+                <p class="text-muted text-center small mt-1">Pagina {{ users_page.page }} di {{ users_page.pages }} ({{ total_users }} utenti totali)</p>
+            </nav>
+            {% endif %}
         </div>
     </div>
 </div>
