@@ -85,6 +85,21 @@ def admin_recompute_schedule(schedule_id):
     return redirect(url_for("app_routes.admin_maintenance"))
 
 
+@app_routes.route("/admin/schedule/delete/<int:schedule_id>", methods=["POST"])
+@require_admin
+def admin_delete_schedule(schedule_id):
+    schedule = db.session.get(ReadingSchedule, schedule_id)
+    if not schedule:
+        flash("Schedulazione non trovata.")
+        return redirect(url_for("app_routes.admin_maintenance"))
+
+    DeliveryEvent.query.filter_by(schedule_id=schedule.id).delete(synchronize_session=False)
+    db.session.delete(schedule)
+    db.session.commit()
+    flash("Pianificazione eliminata.")
+    return redirect(url_for("app_routes.admin_maintenance"))
+
+
 @app_routes.route("/admin/schedule/reset-progress/<int:schedule_id>", methods=["POST"])
 @require_admin
 def admin_reset_schedule_progress(schedule_id):
@@ -123,6 +138,42 @@ def admin_reset_user_password(user_id):
     user.set_password(new_password)
     db.session.commit()
     flash(f"Password aggiornata per {user.email}.")
+    return redirect(url_for("app_routes.admin_maintenance"))
+
+
+@app_routes.route("/admin/user/edit/<int:user_id>", methods=["POST"])
+@require_admin
+def admin_edit_user(user_id):
+    user = db.session.get(User, user_id)
+    if not user:
+        flash("Utente non trovato.")
+        return redirect(url_for("app_routes.admin_maintenance"))
+
+    new_email = (request.form.get("email") or "").strip().lower()
+    telegram_handle = (request.form.get("telegram_handle") or "").strip()
+    is_admin = request.form.get("is_admin") == "1"
+    is_content_manager = request.form.get("is_content_manager") == "1"
+
+    if not new_email or "@" not in new_email:
+        flash("Email non valida.")
+        return redirect(url_for("app_routes.admin_maintenance"))
+
+    existing = User.query.filter(User.email == new_email, User.id != user_id).first()
+    if existing:
+        flash("Email già in uso da un altro utente.")
+        return redirect(url_for("app_routes.admin_maintenance"))
+
+    # Prevent removing admin role from self
+    if session.get("user_id") == user_id and not is_admin:
+        flash("Non puoi rimuovere il ruolo admin dal tuo stesso account.")
+        return redirect(url_for("app_routes.admin_maintenance"))
+
+    user.email = new_email
+    user.telegram_handle = telegram_handle or None
+    user.is_admin = is_admin
+    user.is_content_manager = is_content_manager
+    db.session.commit()
+    flash(f"Anagrafica aggiornata per {user.email}.")
     return redirect(url_for("app_routes.admin_maintenance"))
 
 
