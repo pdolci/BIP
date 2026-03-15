@@ -3,7 +3,7 @@ from datetime import date, datetime, time, timedelta
 from flask import flash, redirect, render_template, request, session, url_for
 from sqlalchemy.orm import joinedload
 
-from email_sender import DELIVERY_EMAIL, DELIVERY_TELEGRAM, SUPPORTED_DELIVERY_CHANNELS
+from email_sender import DELIVERY_EMAIL, DELIVERY_TELEGRAM, SUPPORTED_DELIVERY_CHANNELS, send_next_book_part, verify_deliver_now_token
 from extensions import db
 from models import Book, DeliveryEvent, ReadingSchedule, User
 from schedule_utils import (
@@ -15,11 +15,13 @@ from schedule_utils import (
     serialize_weekdays,
 )
 from semantic_search import semantic_book_index
-from time_utils import compute_next_send_utc, local_naive_to_utc_naive, local_now_naive, utc_now_naive
+from time_utils import compute_next_send_utc, local_naive_to_utc_naive, local_now_naive, utc_now_naive, utc_now_timestamp
 
 from . import app_routes
 from .core import (
     MAX_ACTIVE_SUBSCRIPTIONS,
+    SESSION_LAST_ACTIVITY_KEY,
+    SESSION_VERSION_KEY,
     _build_book_filters,
     _build_dashboard,
     _count_book_words,
@@ -395,6 +397,44 @@ def travel_mode_schedule(schedule_id):
     db.session.commit()
     flash(f"Modalità viaggio attivata per {travel_days} giorni.")
     return redirect(url_for("app_routes.select_book"))
+
+
+@app_routes.route("/deliver_now/<token>")
+def deliver_now(token):
+    """Invia subito il prossimo estratto tramite link firmato ricevuto via email."""
+    schedule_id, user_id = verify_deliver_now_token(token)
+    if not schedule_id:
+        flash("Link non valido o scaduto.")
+        return redirect(url_for("app_routes.login"))
+
+    schedule = db.session.get(ReadingSchedule, schedule_id)
+    if not schedule or schedule.user_id != user_id:
+        flash("Link non valido.")
+        return redirect(url_for("app_routes.login"))
+
+    if schedule.is_paused:
+        flash("La sottoscrizione è in pausa: riprendi la lettura dal centro di controllo.")
+        return redirect(url_for("app_routes.login"))
+
+    total_words = _count_book_words(schedule)
+    if _is_schedule_completed(schedule, total_words):
+        flash("Hai già completato questo libro!")
+        return redirect(url_for("app_routes.login"))
+
+    send_next_book_part(schedule_id)
+
+    # Auto-login: il token HMAC autentica l'utente senza richiedere la password.
+    user = db.session.get(User, user_id)
+    if user:
+        session.clear()
+        session["user_id"] = user.id
+        session["is_admin"] = user.is_admin
+        session["is_content_manager"] = user.is_content_manager
+        session[SESSION_VERSION_KEY] = user.session_version
+        session[SESSION_LAST_ACTIVITY_KEY] = utc_now_timestamp()
+
+    flash("Prossimo estratto inviato! Buona lettura.")
+    return redirect(url_for("app_routes.reading_center"))
 
 
 @app_routes.route("/delete_schedule/<int:schedule_id>", methods=["POST"])
