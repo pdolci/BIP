@@ -1,6 +1,7 @@
-from flask import flash, redirect, render_template, request, session, url_for
+from flask import flash, jsonify, redirect, render_template, request, session, url_for
 from sqlalchemy.orm import joinedload
 
+from bip_logging import LEVELS, get_log_level_name, set_log_level
 from extensions import db
 from models import DeliveryEvent, ReadingSchedule, User
 from schedule_utils import compute_next_send_datetime
@@ -53,7 +54,31 @@ def admin_maintenance():
         describe_frequency=describe_frequency,
         describe_delivery_channel=describe_delivery_channel,
         format_app_datetime=format_app_datetime,
+        log_level=get_log_level_name(),
+        log_levels=list(LEVELS.keys()),
     )
+
+
+@app_routes.route("/admin/log-level", methods=["GET"])
+@require_admin
+def admin_get_log_level():
+    return jsonify({"level": get_log_level_name()})
+
+
+@app_routes.route("/admin/log-level", methods=["POST"])
+@require_admin
+def admin_set_log_level():
+    level = (request.form.get("level") or "").strip().lower()
+    if not level:
+        data = request.get_json(silent=True) or {}
+        level = (data.get("level") or "").strip().lower()
+    try:
+        set_log_level(level)
+    except ValueError as exc:
+        flash(str(exc))
+        return redirect(url_for("app_routes.admin_maintenance"))
+    flash(f"Livello di log impostato a «{level}».")
+    return redirect(url_for("app_routes.admin_maintenance"))
 
 
 @app_routes.route("/admin/schedule/toggle-pause/<int:schedule_id>", methods=["POST"])

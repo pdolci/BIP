@@ -1,15 +1,13 @@
-import logging
-
 from apscheduler.schedulers.background import BackgroundScheduler
 from flask import Flask
 
+from bip_logging import get_logger
 from email_sender import send_next_book_part
 from extensions import db
 from models import ReadingSchedule
 from time_utils import utc_now_naive, compute_next_send_utc
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
-
+logger = get_logger(__name__)
 scheduler = None
 
 
@@ -51,7 +49,7 @@ def _due_schedules(now):
 
 
 def check_scheduled_emails(app: Flask):
-    logging.info("✅ Job check_scheduled_emails AVVIATO")
+    logger.info("✅ Job check_scheduled_emails AVVIATO")
 
     with app.app_context():
         now = utc_now_naive()
@@ -59,7 +57,7 @@ def check_scheduled_emails(app: Flask):
         schedules = _due_schedules(now)
 
         if not schedules:
-            logging.info("⚠️ Nessun programma di lettura trovato con next_send_date passato.")
+            logger.info("⚠️ Nessun programma di lettura trovato con next_send_date passato.")
             return
 
         for schedule in schedules:
@@ -76,7 +74,7 @@ def check_scheduled_emails(app: Flask):
 
             send_next_book_part(schedule.id)
 
-    logging.info("✅ Job check_scheduled_emails COMPLETATO")
+    logger.info("✅ Job check_scheduled_emails COMPLETATO")
 
 
 def start_scheduler(app: Flask):
@@ -93,10 +91,10 @@ def start_scheduler(app: Flask):
         )
         try:
             scheduler.start()
-            logging.info("🚀 Scheduler avviato con successo!")
+            logger.info("🚀 Scheduler avviato con successo!")
         except Exception as error:
-            logging.info(f"⚠️ Scheduler già in esecuzione: {error}")
+            logger.info(f"⚠️ Scheduler già in esecuzione: {error}")
     else:
-        logging.info("⚠️ Scheduler era già attivo, nessuna azione necessaria.")
+        logger.info("⚠️ Scheduler era già attivo, nessuna azione necessaria.")
 
     return scheduler
