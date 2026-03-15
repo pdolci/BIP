@@ -32,6 +32,36 @@
         </div>
     </div>
 
+    <!-- Widget livello di log -->
+    <div class="col-12">
+        <div class="card panel-card p-3">
+            <div class="d-flex align-items-center gap-3 flex-wrap">
+                <div>
+                    <i class="bi bi-journal-text me-1 text-muted"></i>
+                    <span class="small text-uppercase text-muted fw-semibold">Livello di log</span>
+                </div>
+                <form action="{{ url_for('app_routes.admin_set_log_level') }}" method="post" class="d-flex align-items-center gap-2">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <select name="level" class="form-select form-select-sm" style="width:auto">
+                        {% for lvl in log_levels %}
+                        <option value="{{ lvl }}" {% if lvl == log_level %}selected{% endif %}>
+                            {{ lvl | upper }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                    <button type="submit" class="btn btn-sm btn-outline-secondary" title="Applica livello">
+                        <i class="bi bi-check2"></i>
+                    </button>
+                </form>
+                <span class="small text-muted">
+                    I log vengono scritti su <code>syslog/journald</code>
+                    (<code>journalctl -t bip</code>). Il livello è persistito nel DB
+                    e aggiornato su tutti i processi entro 30 secondi.
+                </span>
+            </div>
+        </div>
+    </div>
+
     <div class="col-12">
         <div class="card panel-card p-4">
             <h3 class="mb-3">Utenti e libri scelti</h3>

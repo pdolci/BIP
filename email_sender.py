@@ -1,6 +1,5 @@
 import html
 import json
-import logging
 import re
 import urllib.parse
 import urllib.error
@@ -8,6 +7,7 @@ import urllib.request
 from dataclasses import dataclass
 
 import chardet
+from bip_logging import get_logger
 from html_processing import sanitize_uploaded_html
 from flask_mail import Message
 from sqlalchemy.orm import joinedload
@@ -16,6 +16,8 @@ from config import Config
 from extensions import db, mail
 from models import DeliveryEvent, ReadingSchedule
 from time_utils import utc_now_naive, compute_next_send_utc
+
+logger = get_logger(__name__)
 
 ANSI_ESCAPE_RE = re.compile(r"\x1B(?:\[[0-?]*[ -/]*[@-~]|[@-Z\\-_])")
 CONTROL_CHARS_RE = re.compile(r"[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]")
@@ -39,10 +41,10 @@ def send_email(to, subject, body, html_body=None):
         if html_body:
             msg.html = html_body
         mail.send(msg)
-        logging.info(f"✅ Email inviata correttamente a {to}")
+        logger.info(f"✅ Email inviata correttamente a {to}")
         return True
     except Exception as error:
-        logging.error(f"❌ Errore nell'invio email a {to}: {error}")
+        logger.error(f"❌ Errore nell'invio email a {to}: {error}")
         return False
 
 
@@ -68,12 +70,12 @@ def send_email_confirmation_request(to, confirmation_url):
 def send_telegram_message(chat_id, message):
     token = Config.TELEGRAM_BOT_TOKEN
     if not token:
-        logging.error("❌ TELEGRAM_BOT_TOKEN non configurato: impossibile inviare su Telegram.")
+        logger.error("❌ TELEGRAM_BOT_TOKEN non configurato: impossibile inviare su Telegram.")
         return False
 
     chat_id = (chat_id or "").strip()
     if not chat_id:
-        logging.error("❌ chat_id Telegram non valido.")
+        logger.error("❌ chat_id Telegram non valido.")
         return False
 
     api_url = f"https://api.telegram.org/bot{token}/sendMessage"
@@ -108,7 +110,7 @@ def send_telegram_message(chat_id, message):
 
     messages = split_message(message, TELEGRAM_MAX_MESSAGE_LENGTH)
     if not messages:
-        logging.error("❌ Messaggio Telegram vuoto: invio annullato.")
+        logger.error("❌ Messaggio Telegram vuoto: invio annullato.")
         return False
 
     try:
@@ -118,9 +120,9 @@ def send_telegram_message(chat_id, message):
             with urllib.request.urlopen(req, timeout=10) as response:
                 body = json.loads(response.read().decode("utf-8"))
             if not body.get("ok"):
-                logging.error(f"❌ Telegram API error (chunk {index}/{len(messages)}): {body}")
+                logger.error(f"❌ Telegram API error (chunk {index}/{len(messages)}): {body}")
                 return False
-        logging.info(f"✅ Messaggio Telegram inviato a chat_id {chat_id} in {len(messages)} parte/i")
+        logger.info(f"✅ Messaggio Telegram inviato a chat_id {chat_id} in {len(messages)} parte/i")
         return True
     except urllib.error.HTTPError as error:
         response_body = ""
@@ -128,7 +130,7 @@ def send_telegram_message(chat_id, message):
             response_body = error.read().decode("utf-8", errors="replace")
         except Exception:
             response_body = "<impossibile leggere il body della risposta Telegram>"
-        logging.error(
+        logger.error(
             "❌ Telegram HTTP error per chat_id %s: status=%s reason=%s response=%s",
             chat_id,
             error.code,
@@ -136,9 +138,9 @@ def send_telegram_message(chat_id, message):
             response_body,
         )
     except urllib.error.URLError as error:
-        logging.error("❌ Telegram URL error per chat_id %s: reason=%s", chat_id, error.reason)
+        logger.error("❌ Telegram URL error per chat_id %s: reason=%s", chat_id, error.reason)
     except Exception as error:
-        logging.exception(f"❌ Errore invio Telegram a chat_id {chat_id}: {error}")
+        logger.exception(f"❌ Errore invio Telegram a chat_id {chat_id}: {error}")
 
     return False
 
@@ -305,7 +307,7 @@ def count_total_words(file_path):
                 content = html_to_text(normalize_html_for_chunking(content))
             return len(re.findall(r"\S+", content))
     except Exception as error:
-        logging.warning(f"⚠️ Impossibile contare parole file {file_path}: {error}")
+        logger.warning(f"⚠️ Impossibile contare parole file {file_path}: {error}")
         return 0
 
 
@@ -340,7 +342,7 @@ def read_file_chunk(file_path, start_idx, length):
             chunk_text = source_content[chunk_start_char:chunk_end_char].strip()
             return ContentChunk(plain_text=chunk_text), end_word_index, source_is_html
     except Exception as error:
-        logging.error(f"❌ Errore nella lettura del file {file_path}: {error}")
+        logger.error(f"❌ Errore nella lettura del file {file_path}: {error}")
         return None, start_idx, False
 
 
@@ -373,12 +375,12 @@ def _send_chunk_via_telegram(user, text_payload):
     lasciando al chiamante la decisione su eventuali alternative.
     """
     if not user.telegram_handle:
-        logging.warning(f"⚠️ Utente {user.id} senza handle Telegram: impossibile inviare via Telegram.")
+        logger.warning(f"⚠️ Utente {user.id} senza handle Telegram: impossibile inviare via Telegram.")
         return False
 
     sent = send_telegram_message(user.telegram_handle, text_payload)
     if not sent:
-        logging.warning(f"⚠️ Invio Telegram fallito per user={user.id}.")
+        logger.warning(f"⚠️ Invio Telegram fallito per user={user.id}.")
     return sent
 
 
@@ -405,7 +407,7 @@ def _deliver_chunk(user, schedule, book, text_payload, html_payload, part_number
     if channel == DELIVERY_TELEGRAM:
         if _send_chunk_via_telegram(user, text_payload):
             return True, DELIVERY_TELEGRAM
-        logging.warning(f"⚠️ Attivo fallback email per user={user.id}.")
+        logger.warning(f"⚠️ Attivo fallback email per user={user.id}.")
 
     email_sent = _send_chunk_via_email(
         user,
@@ -425,13 +427,13 @@ def send_next_book_part(schedule_id):
         joinedload(ReadingSchedule.user),
     ).filter_by(id=schedule_id).first()
     if not schedule:
-        logging.error(f"⚠️ Nessun programma di lettura trovato con ID {schedule_id}")
+        logger.error(f"⚠️ Nessun programma di lettura trovato con ID {schedule_id}")
         return
 
     book = schedule.book
     user = schedule.user
     if not book or not user:
-        logging.error("⚠️ Errore: Nessun libro o utente trovato")
+        logger.error("⚠️ Errore: Nessun libro o utente trovato")
         return
 
     file_path = book.get_absolute_path()
@@ -442,7 +444,7 @@ def send_next_book_part(schedule_id):
         schedule.words_per_minute * schedule.minutes_per_reading,
     )
     if not chunk:
-        logging.info("⚠️ Nessun altro testo da inviare, fine della lettura.")
+        logger.info("⚠️ Nessun altro testo da inviare, fine della lettura.")
         return
 
     words_sent = max(new_index - schedule.last_sent_index, 0)
@@ -488,19 +490,19 @@ def send_next_book_part(schedule_id):
             )
         )
         db.session.commit()
-        logging.info(f"✅ Delivery completata per schedule={schedule.id} via {effective_channel}")
+        logger.info(f"✅ Delivery completata per schedule={schedule.id} via {effective_channel}")
     except Exception as error:
         db.session.rollback()
-        logging.error(f"❌ Errore nel commit del database: {error}")
+        logger.error(f"❌ Errore nel commit del database: {error}")
         return
 
     # 5) Se il libro è finito, invia la notifica di completamento.
     if total_words > 0 and new_index >= total_words:
         try:
             send_book_completion_notification(user, book)
-            logging.info(f"✅ Notifica completamento inviata per schedule={schedule.id}")
+            logger.info(f"✅ Notifica completamento inviata per schedule={schedule.id}")
         except Exception as error:
-            logging.error(f"❌ Errore nell'invio della notifica di completamento: {error}")
+            logger.error(f"❌ Errore nell'invio della notifica di completamento: {error}")
 
 
 def send_book_completion_notification(user, book):
@@ -523,7 +525,7 @@ def send_book_completion_notification(user, book):
         sent = send_telegram_message(telegram_handle, f"{subject}\n\n{plain_body}")
         if sent:
             return
-        logging.warning("⚠️ Fallback email per notifica completamento user=%s", user.id)
+        logger.warning("⚠️ Fallback email per notifica completamento user=%s", user.id)
     send_email(user.email, subject, plain_body, html_body=html_body)
 
 

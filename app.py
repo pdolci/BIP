@@ -4,6 +4,7 @@ from flask import Flask, flash, redirect, request, url_for
 from limits.storage import storage_from_string
 from werkzeug.middleware.proxy_fix import ProxyFix
 
+from bip_logging import setup_logging
 from config import Config
 from extensions import csrf, db, limiter, mail, migrate
 from routes import app_routes
@@ -86,6 +87,7 @@ def create_app(config_class=Config):
     app.config.from_object(config_class)
 
     db.init_app(app)
+    setup_logging(app)
     mail.init_app(app)
     migrate.init_app(app, db)
     _configure_rate_limiter_storage(app)

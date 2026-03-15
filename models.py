@@ -89,6 +89,13 @@ class DeliveryEvent(db.Model):
     schedule = db.relationship("ReadingSchedule", backref=db.backref("delivery_events", lazy=True, cascade="all, delete-orphan"), lazy=True)
 
 
+class AppSetting(db.Model):
+    """Impostazioni applicative persistite a DB (chiave-valore)."""
+    __tablename__ = "app_setting"
+    key   = db.Column(db.String(64), primary_key=True)
+    value = db.Column(db.String(255), nullable=False)
+
+
 def _remove_file_if_exists(path):
     if path and os.path.isfile(path):
         os.remove(path)
