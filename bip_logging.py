@@ -101,9 +101,10 @@ def setup_logging(app) -> logging.Logger:
 
     dyn_filter = _DynamicLevelFilter()
 
-    # Formato: journald aggiunge già timestamp e hostname; includiamo solo
-    # nome del logger, PID, livello e messaggio per evitare duplicazioni.
-    fmt = logging.Formatter("%(name)s[%(process)d]: %(levelname)s %(message)s")
+    # Ident fisso "bip" → journald imposta SYSLOG_IDENTIFIER=bip su ogni
+    # record, rendendo possibile filtrare con: journalctl -t bip
+    # Il nome del logger (modulo) va nel corpo del messaggio.
+    fmt = logging.Formatter(f"{APP_NAME}[%(process)d]: %(levelname)s %(name)s %(message)s")
 
     # Handler syslog/journald — l'OS gestisce rotazione, compressione e indice.
     if os.path.exists(_SYSLOG_SOCKET):
