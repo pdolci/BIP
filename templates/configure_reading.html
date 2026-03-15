@@ -1,8 +1,102 @@
 {% extends "base.html" %}
 
 {% block content %}
+<style>
+.alarm-time-input {
+    font-size: 3.2rem;
+    font-weight: 300;
+    letter-spacing: 0.05em;
+    border: none;
+    border-bottom: 2px solid #dee2e6;
+    border-radius: 0;
+    text-align: center;
+    color: #212529;
+    background: transparent;
+    width: 100%;
+    max-width: 200px;
+    padding: 0.1rem 0.25rem 0.4rem;
+    cursor: pointer;
+}
+.alarm-time-input:focus {
+    outline: none;
+    border-bottom-color: #0d6efd;
+    box-shadow: none;
+}
+
+.day-picker { display: flex; gap: 0.5rem; flex-wrap: wrap; justify-content: center; }
+.day-picker input[type="checkbox"] { display: none; }
+.day-label {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    border: 2px solid #dee2e6;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    color: #6c757d;
+    transition: background-color 0.12s, border-color 0.12s, color 0.12s;
+    user-select: none;
+}
+.day-picker input[type="checkbox"]:checked + .day-label {
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+    color: #fff;
+}
+
+.dur-picker { display: flex; gap: 0.5rem; flex-wrap: wrap; justify-content: center; }
+.dur-picker input[type="radio"] { display: none; }
+.dur-label {
+    padding: 0.4rem 1.1rem;
+    border-radius: 999px;
+    border: 2px solid #dee2e6;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    color: #6c757d;
+    transition: background-color 0.12s, border-color 0.12s, color 0.12s;
+    user-select: none;
+}
+.dur-picker input[type="radio"]:checked + .dur-label {
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+    color: #fff;
+}
+
+.chan-picker { display: flex; gap: 0.5rem; justify-content: center; }
+.chan-picker input[type="radio"] { display: none; }
+.chan-label {
+    padding: 0.5rem 2rem;
+    border-radius: 999px;
+    border: 2px solid #dee2e6;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    color: #6c757d;
+    transition: background-color 0.12s, border-color 0.12s, color 0.12s;
+    user-select: none;
+}
+.chan-picker input[type="radio"]:checked + .chan-label {
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+    color: #fff;
+}
+
+.section-label {
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #adb5bd;
+    text-align: center;
+    margin-bottom: 0.75rem;
+}
+</style>
+
 <div class="row justify-content-center g-4">
-    <div class="col-lg-10">
+    <div class="col-lg-6 col-md-8">
         <p class="text-muted mb-0">
             <a href="{{ url_for('app_routes.select_book') }}" class="link-secondary text-decoration-none">
                 <i class="bi bi-arrow-left me-1"></i>Torna alla ricerca libri
@@ -10,113 +104,113 @@
         </p>
     </div>
 
-    <div class="col-lg-10">
+    <div class="col-lg-6 col-md-8">
         <div class="card panel-card p-4">
-            <div class="d-flex justify-content-between align-items-start gap-3 mb-4">
-                <h2 class="mb-0"><i class="bi bi-sliders me-2"></i>Configura la tua lettura</h2>
+
+            <!-- Book info -->
+            <div class="d-flex align-items-center gap-3 mb-4 pb-3 border-bottom">
                 <img
-                    class="selected-book-cover"
                     src="{{ url_for('app_routes.book_cover', book_id=selected_book.id) }}"
-                    alt="Copertina di {{ selected_book.title }}"
+                    alt="Copertina"
                     loading="lazy"
+                    style="width:48px;height:48px;object-fit:cover;border-radius:6px;flex-shrink:0;"
                 >
-            </div>
-
-            <div class="mb-4 p-3 border rounded bg-light" id="book-preview">
-                <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
-                    <div>
-                        <strong>{{ selected_book.title }}</strong>
-                        <div class="text-muted small">
-                            {{ selected_book.author or 'Autore n/d' }} · {{ selected_book.publication_year or 'Anno n/d' }} · {{ selected_book.genre or 'Genere n/d' }} · {{ selected_book.language or 'Lingua n/d' }}
-                        </div>
+                <div class="overflow-hidden">
+                    <div class="fw-semibold text-truncate">{{ selected_book.title }}</div>
+                    <div class="small text-muted text-truncate">
+                        {{ selected_book.author or 'Autore n/d' }}{% if selected_book.publication_year %} · {{ selected_book.publication_year }}{% endif %}
                     </div>
-                    <span class="badge text-bg-primary">
-                        {% if selected_book.estimated_reading_hours %}{{ selected_book.estimated_reading_hours }} ore{% else %}Durata n/d{% endif %}
-                    </span>
                 </div>
-                <p class="small mt-2 mb-1">{{ selected_book.short_description or 'Nessuna descrizione disponibile.' }}</p>
-                <p class="small text-muted mb-0">Tag: {{ selected_book.tags or 'n/d' }}</p>
             </div>
 
-            <form method="POST">
+            <form method="POST" id="alarm-form">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="frequency_type" value="weekdays">
 
-                <div class="mb-3">
-                    <label class="form-label">Velocità lettura (parole/minuto)</label>
-                    <input type="number" name="words_per_minute" class="form-control" value="200" min="1">
+                <!-- TIME -->
+                <div class="text-center mb-4">
+                    <div class="section-label">Orario</div>
+                    <input
+                        type="time"
+                        name="delivery_time"
+                        value="08:00"
+                        class="alarm-time-input"
+                        required
+                    >
                 </div>
-                <div class="mb-3">
-                    <label class="form-label">Minuti per sessione di lettura</label>
-                    <input type="number" name="minutes_per_reading" class="form-control" required>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Frequenza di invio</label>
-                    <select name="frequency_type" id="frequency-type" class="form-select">
-                        <option value="every_n_days">Ogni N giorni</option>
-                        <option value="daily">Giornaliera</option>
-                        <option value="weekdays">Giorni specifici</option>
-                        <option value="weekend">Solo weekend</option>
-                    </select>
-                </div>
-                <div class="mb-3" id="frequency-days-group">
-                    <label class="form-label">Ogni quanti giorni (se scegli "Ogni N giorni")</label>
-                    <input type="number" name="frequency_days" class="form-control" value="1" min="1">
-                </div>
-                <div class="mb-3 d-none" id="weekdays-group">
-                    <label class="form-label">Giorni specifici (Lun/Mer/Ven...)</label>
-                    <div class="d-flex flex-wrap gap-2">
-                        {% set weekday_labels = [('0','Lun'),('1','Mar'),('2','Mer'),('3','Gio'),('4','Ven'),('5','Sab'),('6','Dom')] %}
-                        {% for day_value, day_label in weekday_labels %}
-                        <label class="btn btn-outline-secondary btn-sm">
-                            <input class="form-check-input me-1" type="checkbox" name="weekdays" value="{{ day_value }}">{{ day_label }}
-                        </label>
+
+                <!-- DAYS -->
+                <div class="mb-4">
+                    <div class="section-label">Giorni</div>
+                    <div class="day-picker">
+                        {% set days = [('0','L'),('1','M'),('2','M'),('3','G'),('4','V'),('5','S'),('6','D')] %}
+                        {% for val, lbl in days %}
+                        <input type="checkbox" name="weekdays" value="{{ val }}" id="day-{{ val }}" {% if val|int < 5 %}checked{% endif %}>
+                        <label class="day-label" for="day-{{ val }}" title="{{ ['Lunedì','Martedì','Mercoledì','Giovedì','Venerdì','Sabato','Domenica'][val|int] }}">{{ lbl }}</label>
                         {% endfor %}
                     </div>
                 </div>
-                <div class="mb-3">
-                    <label class="form-label">Canale di consegna</label>
-                    <select name="delivery_channel" id="delivery-channel" class="form-select">
-                        <option value="{{ delivery_email }}" {% if default_delivery_channel == delivery_email %}selected{% endif %}>Email</option>
-                        <option value="{{ delivery_telegram }}" {% if default_delivery_channel == delivery_telegram %}selected{% endif %}>Telegram</option>
-                    </select>
-                </div>
-                <div class="mb-3 d-none" id="telegram-handle-group">
-                    <label class="form-label">Handle Telegram</label>
-                    <input type="text" name="telegram_handle" class="form-control" placeholder="es. @mio_handle" value="{{ session_telegram_handle or '' }}">
-                    <small class="text-muted">Verrà salvato nel tuo profilo e usato per le prossime consegne Telegram.</small>
-                </div>
+
+                <!-- DURATION -->
                 <div class="mb-4">
-                    <label class="form-label">Orario consegna (es. 07:30 o "dopo cena")</label>
-                    <input type="text" name="delivery_time" class="form-control" placeholder="07:30 oppure dopo cena">
+                    <div class="section-label">Durata sessione</div>
+                    <div class="dur-picker">
+                        {% for mins in [5, 10, 15, 20, 30] %}
+                        <input type="radio" name="minutes_per_reading" value="{{ mins }}" id="dur-{{ mins }}" {% if mins == 10 %}checked{% endif %}>
+                        <label class="dur-label" for="dur-{{ mins }}">{{ mins }} min</label>
+                        {% endfor %}
+                    </div>
                 </div>
-                <button type="submit" class="btn btn-primary w-100">Imposta Programma</button>
+
+                <!-- CHANNEL -->
+                <div class="mb-4">
+                    <div class="section-label">Ricevi via</div>
+                    <div class="chan-picker">
+                        <input type="radio" name="delivery_channel" value="{{ delivery_email }}" id="chan-email" {% if default_delivery_channel == delivery_email %}checked{% endif %}>
+                        <label class="chan-label" for="chan-email"><i class="bi bi-envelope me-1"></i>Email</label>
+                        <input type="radio" name="delivery_channel" value="{{ delivery_telegram }}" id="chan-telegram" {% if default_delivery_channel == delivery_telegram %}checked{% endif %}>
+                        <label class="chan-label" for="chan-telegram"><i class="bi bi-telegram me-1"></i>Telegram</label>
+                    </div>
+                </div>
+
+                <!-- TELEGRAM HANDLE -->
+                <div class="mb-4 d-none" id="telegram-group">
+                    <div class="section-label">Handle Telegram</div>
+                    <input
+                        type="text"
+                        name="telegram_handle"
+                        id="telegram-handle"
+                        class="form-control text-center"
+                        placeholder="@username"
+                        value="{{ session_telegram_handle or '' }}"
+                    >
+                </div>
+
+                <button type="submit" class="btn btn-primary w-100 py-2 fw-semibold mt-1">
+                    <i class="bi bi-alarm me-2"></i>Imposta allarme
+                </button>
             </form>
         </div>
     </div>
 </div>
 
 <script>
-    const frequencySelect = document.getElementById("frequency-type");
-    const frequencyDaysGroup = document.getElementById("frequency-days-group");
-    const weekdaysGroup = document.getElementById("weekdays-group");
-    const deliveryChannelSelect = document.getElementById("delivery-channel");
-    const telegramHandleGroup = document.getElementById("telegram-handle-group");
+const chanTelegram = document.getElementById("chan-telegram");
+const chanEmail    = document.getElementById("chan-email");
+const telegramGrp  = document.getElementById("telegram-group");
 
-    const updateFrequencyFields = () => {
-        const value = frequencySelect.value;
-        frequencyDaysGroup.classList.toggle("d-none", value !== "every_n_days");
-        weekdaysGroup.classList.toggle("d-none", value !== "weekdays");
-    };
+const syncChannel = () => telegramGrp.classList.toggle("d-none", !chanTelegram.checked);
+chanTelegram.addEventListener("change", syncChannel);
+chanEmail.addEventListener("change", syncChannel);
+syncChannel();
 
-    const updateDeliveryFields = () => {
-        const value = deliveryChannelSelect.value;
-        telegramHandleGroup.classList.toggle("d-none", value !== "{{ delivery_telegram }}");
-    };
-
-    frequencySelect.addEventListener("change", updateFrequencyFields);
-    deliveryChannelSelect.addEventListener("change", updateDeliveryFields);
-
-    updateFrequencyFields();
-    updateDeliveryFields();
+document.getElementById("alarm-form").addEventListener("submit", e => {
+    const checked = document.querySelectorAll('input[name="weekdays"]:checked');
+    if (checked.length === 0) {
+        e.preventDefault();
+        checked.length === 0 && document.querySelector(".day-picker").scrollIntoView({ behavior: "smooth" });
+        alert("Seleziona almeno un giorno della settimana.");
+    }
+});
 </script>
 {% endblock %}
