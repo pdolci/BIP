@@ -8,32 +8,32 @@
             <div class="row g-3">
                 <div class="col-md-3">
                     <div class="metric-box">
-                        <small>Sottoscrizioni</small>
+                        <small><i class="bi bi-collection me-1"></i>Sottoscrizioni</small>
                         <h4>{{ active_schedules|length }}</h4>
                     </div>
                 </div>
                 <div class="col-md-3">
                     <div class="metric-box">
-                        <small>Completamento medio</small>
+                        <small><i class="bi bi-pie-chart me-1"></i>Completamento medio</small>
                         <h4>{{ dashboard.completion if dashboard else 0 }}%</h4>
                     </div>
                 </div>
                 <div class="col-md-3">
                     <div class="metric-box">
-                        <small>Parole rimanenti</small>
+                        <small><i class="bi bi-fonts me-1"></i>Parole rimanenti</small>
                         <h4>{{ dashboard.remaining_words if dashboard else 0 }}</h4>
                     </div>
                 </div>
                 <div class="col-md-3">
                     <div class="metric-box">
-                        <small>Tempo rimanente</small>
+                        <small><i class="bi bi-clock me-1"></i>Tempo rimanente</small>
                         <h4>{{ dashboard.remaining_minutes if dashboard else 0 }} min</h4>
                     </div>
                 </div>
             </div>
             {% if dashboard and dashboard.history %}
             <hr>
-            <h6 class="mb-2">Ultimi eventi</h6>
+            <h6 class="mb-2"><i class="bi bi-clock-history me-1"></i>Ultimi eventi</h6>
             <ul class="list-group list-group-flush">
                 {% for item in dashboard.history[:5] %}
                 <li class="list-group-item d-flex justify-content-between align-items-start">
@@ -42,7 +42,7 @@
                         <div class="text-muted small">{{ format_app_datetime(item.created_at) }}</div>
                     </div>
                     <span class="small">
-                        {% if item.event_type == 'sent' %}✅ Inviata{% elif item.event_type == 'skipped' %}⚠️ Saltata{% elif item.event_type == 'paused' %}⏸️ Pausa{% elif item.event_type == 'resumed' %}▶️ Ripresa{% else %}{{ item.event_type }}{% endif %}
+                        {% if item.event_type == 'sent' %}<i class="bi bi-check-circle-fill text-success me-1"></i>Inviata{% elif item.event_type == 'skipped' %}<i class="bi bi-skip-forward-fill text-warning me-1"></i>Saltata{% elif item.event_type == 'paused' %}<i class="bi bi-pause-circle-fill text-secondary me-1"></i>Pausa{% elif item.event_type == 'resumed' %}<i class="bi bi-play-circle-fill text-success me-1"></i>Ripresa{% else %}{{ item.event_type }}{% endif %}
                     </span>
                 </li>
                 {% endfor %}
@@ -101,17 +101,17 @@
                             <form action="{{ url_for('app_routes.snooze_schedule', schedule_id=schedule.id) }}" method="post" class="d-inline">
                                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                 <input type="hidden" name="action" value="skip_next">
-                                <button type="submit" class="btn btn-outline-secondary btn-sm">Salta prossima</button>
+                                <button type="submit" class="btn btn-outline-secondary btn-sm"><i class="bi bi-skip-forward me-1"></i>Salta prossima</button>
                             </form>
                             <form action="{{ url_for('app_routes.snooze_schedule', schedule_id=schedule.id) }}" method="post" class="d-inline">
                                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                 <input type="hidden" name="action" value="delay_24h">
-                                <button type="submit" class="btn btn-outline-secondary btn-sm">Rimanda 24h</button>
+                                <button type="submit" class="btn btn-outline-secondary btn-sm"><i class="bi bi-clock-history me-1"></i>Rimanda 24h</button>
                             </form>
                             <form action="{{ url_for('app_routes.travel_mode_schedule', schedule_id=schedule.id) }}" method="post" class="d-flex gap-2 align-items-center">
                                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                 <input type="number" name="travel_days" class="form-control form-control-sm" min="1" value="7" style="max-width: 90px;">
-                                <button type="submit" class="btn btn-outline-warning btn-sm">Viaggio</button>
+                                <button type="submit" class="btn btn-outline-warning btn-sm"><i class="bi bi-airplane me-1"></i>Viaggio</button>
                             </form>
                             <form action="{{ url_for('app_routes.delete_schedule', schedule_id=schedule.id) }}" method="post" class="d-inline">
                                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -123,7 +123,7 @@
                 {% endfor %}
             </div>
             {% else %}
-            <div class="alert alert-info mb-0">Non hai ancora sottoscrizioni attive. Configura la prima lettura dalla sezione "Ricerca".</div>
+            <div class="alert alert-info mb-0"><i class="bi bi-info-circle me-2"></i>Non hai ancora sottoscrizioni attive. Configura la prima lettura dalla sezione "Ricerca".</div>
             {% endif %}
         </div>
     </div>
