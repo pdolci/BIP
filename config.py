@@ -82,6 +82,10 @@ class Config:
 
     TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 
+    # URL pubblico dell'app (es. https://miosito.com) usato per generare link nelle email.
+    # Lasciare vuoto per disabilitare i link "invia subito" nelle email.
+    APP_BASE_URL = os.environ.get("APP_BASE_URL", "").rstrip("/")
+
     DEBUG = _get_bool_env("FLASK_DEBUG", False)
     SESSION_COOKIE_SECURE = _get_bool_env("SESSION_COOKIE_SECURE", True)
     SESSION_COOKIE_HTTPONLY = _get_bool_env("SESSION_COOKIE_HTTPONLY", True)

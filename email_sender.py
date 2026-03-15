@@ -1,9 +1,13 @@
+import hashlib
+import hmac
 import html
 import json
 import re
+import time as _time
 import urllib.parse
 import urllib.error
 import urllib.request
+from base64 import urlsafe_b64decode, urlsafe_b64encode
 from dataclasses import dataclass
 
 import chardet
@@ -26,6 +30,34 @@ DELIVERY_EMAIL = "email"
 DELIVERY_TELEGRAM = "telegram"
 SUPPORTED_DELIVERY_CHANNELS = {DELIVERY_EMAIL, DELIVERY_TELEGRAM}
 TELEGRAM_MAX_MESSAGE_LENGTH = 4000
+
+_DELIVER_NOW_EXPIRY_SECONDS = 48 * 3600  # il link è valido 48 ore
+
+
+def _deliver_now_sign(payload: str) -> str:
+    return hmac.new(Config.SECRET_KEY.encode(), payload.encode(), hashlib.sha256).hexdigest()
+
+
+def generate_deliver_now_token(schedule_id: int, user_id: int) -> str:
+    expiry = int(_time.time()) + _DELIVER_NOW_EXPIRY_SECONDS
+    payload = f"{schedule_id}:{user_id}:{expiry}"
+    sig = _deliver_now_sign(payload)
+    return urlsafe_b64encode(f"{payload}:{sig}".encode()).decode()
+
+
+def verify_deliver_now_token(token: str) -> tuple[int | None, int | None]:
+    try:
+        padded = token + "=" * (-len(token) % 4)
+        decoded = urlsafe_b64decode(padded.encode()).decode()
+        schedule_id_str, user_id_str, expiry_str, sig = decoded.split(":", 3)
+        payload = f"{schedule_id_str}:{user_id_str}:{expiry_str}"
+        if not hmac.compare_digest(_deliver_now_sign(payload), sig):
+            return None, None
+        if _time.time() > int(expiry_str):
+            return None, None
+        return int(schedule_id_str), int(user_id_str)
+    except Exception:
+        return None, None
 
 
 @dataclass
@@ -462,7 +494,20 @@ def send_next_book_part(schedule_id):
         completion_percent,
     )
 
-    # 3) Invio su canale preferito con fallback email se necessario.
+    # 3) Se configurato, aggiunge il link "ricevi subito il prossimo estratto".
+    base_url = Config.APP_BASE_URL
+    if base_url:
+        token = generate_deliver_now_token(schedule.id, user.id)
+        deliver_url = f"{base_url}/deliver_now/{token}"
+        text_payload += f"\n\n---\nVuoi continuare subito? {deliver_url}"
+        html_payload += (
+            "<hr style='border:none;border-top:1px solid #e2e8f0;margin:24px 0'>"
+            "<p style='font-family:Arial,sans-serif;color:#64748b;font-size:13px;text-align:center;margin:0'>"
+            f"Vuoi continuare subito? <a href='{html.escape(deliver_url)}' style='color:#4f46e5;text-decoration:none'>Ricevi subito il prossimo estratto →</a>"
+            "</p>"
+        )
+
+    # 4) Invio su canale preferito con fallback email se necessario.
     delivered, effective_channel = _deliver_chunk(
         user,
         schedule,
@@ -476,7 +521,7 @@ def send_next_book_part(schedule_id):
         return
 
     try:
-        # 4) Persistenza stato avanzamento + audit della consegna.
+        # 5) Persistenza stato avanzamento + audit della consegna.
         schedule.last_sent_index = new_index
         schedule.next_send_date = compute_next_send_utc(schedule, utc_now_naive(), allow_immediate=False)
         db.session.add(
@@ -496,7 +541,7 @@ def send_next_book_part(schedule_id):
         logger.error(f"❌ Errore nel commit del database: {error}")
         return
 
-    # 5) Se il libro è finito, invia la notifica di completamento.
+    # 6) Se il libro è finito, invia la notifica di completamento.
     if total_words > 0 and new_index >= total_words:
         try:
             send_book_completion_notification(user, book)
