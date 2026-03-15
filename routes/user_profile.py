@@ -5,16 +5,13 @@ from extensions import db
 from models import DeliveryEvent, ReadingSchedule, User
 
 from . import app_routes
-from .core import _is_valid_email, _password_requirements_message, _validate_password_requirements
+from .core import _is_valid_email, _password_requirements_message, _validate_password_requirements, require_login
 
 
 @app_routes.route("/profile", methods=["GET", "POST"])
+@require_login
 def profile():
-    if "user_id" not in session:
-        flash("Devi effettuare il login per modificare il profilo.")
-        return redirect(url_for("app_routes.login"))
-
-    user = User.query.get(session["user_id"])
+    user = db.session.get(User, session["user_id"])
     if not user:
         flash("Utente non trovato.")
         return redirect(url_for("app_routes.logout"))
@@ -76,17 +73,14 @@ def profile():
 
 
 @app_routes.route("/profile/delete_account", methods=["POST"])
+@require_login
 def delete_account():
-    if "user_id" not in session:
-        flash("Devi effettuare il login.")
-        return redirect(url_for("app_routes.login"))
-
     confirmation = (request.form.get("delete_confirmation") or "").strip().upper()
     if confirmation != "ELIMINA":
         flash("Per cancellare l'account digita ELIMINA nel campo di conferma.")
         return redirect(url_for("app_routes.profile"))
 
-    user = User.query.get(session["user_id"])
+    user = db.session.get(User, session["user_id"])
     if not user:
         flash("Utente non trovato.")
         return redirect(url_for("app_routes.logout"))

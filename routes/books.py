@@ -13,32 +13,24 @@ from . import app_routes
 from .core import (
     COVER_UPLOAD_FOLDER,
     UPLOAD_FOLDER,
-    _client_ip_address,
     _delete_local_cover_if_present,
     _sanitize_uploaded_book_file,
     _store_cover_on_disk,
     allowed_file,
-    has_book_management_access,
-    is_logged_in,
+    require_book_management,
 )
 
 
 @app_routes.route("/manage_books")
+@require_book_management
 def manage_books():
-    if not is_logged_in() or not has_book_management_access():
-        flash("Accesso negato!")
-        return redirect(url_for("app_routes.index"))
-
     books = Book.query.order_by(Book.title.asc()).all()
     return render_template("admin_books.html", books=books)
 
 
 @app_routes.route("/upload_book", methods=["POST"])
+@require_book_management
 def upload_book():
-    if not is_logged_in() or not has_book_management_access():
-        flash("Accesso negato!")
-        return redirect(url_for("app_routes.index"))
-
     title = (request.form.get("title") or "").strip()
     file = request.files.get("book_file")
     if not title or not file or not file.filename:
@@ -107,12 +99,9 @@ def upload_book():
 
 
 @app_routes.route("/admin/book/edit/<int:book_id>", methods=["POST"])
+@require_book_management
 def edit_book(book_id):
-    if not is_logged_in() or not has_book_management_access():
-        flash("Accesso negato!")
-        return redirect(url_for("app_routes.index"))
-
-    book = Book.query.get(book_id)
+    book = db.session.get(Book, book_id)
     if not book:
         flash("Libro non trovato.")
         return redirect(url_for("app_routes.manage_books"))
@@ -161,21 +150,24 @@ def edit_book(book_id):
 
 
 @app_routes.route("/uploads/books/<filename>")
+@require_book_management
 def uploaded_file(filename):
-    if not is_logged_in() or not has_book_management_access():
-        logging.warning("Tentativo non autorizzato di accesso diretto a file libro: %s (ip=%s)", filename, _client_ip_address())
-        abort(404)
     return send_from_directory(UPLOAD_FOLDER, filename, as_attachment=True)
 
 
 @app_routes.route("/uploads/covers/<filename>")
 def uploaded_cover(filename):
+    ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+    if ext not in {"png", "jpg", "jpeg", "gif", "webp"}:
+        abort(404)
     return send_from_directory(COVER_UPLOAD_FOLDER, filename)
 
 
 @app_routes.route("/book_cover/<int:book_id>")
 def book_cover(book_id):
-    book = Book.query.get_or_404(book_id)
+    book = db.session.get(Book, book_id)
+    if not book:
+        abort(404)
     if not book.cover_image:
         return redirect(url_for("static", filename="images/cover.png"))
 
@@ -186,12 +178,9 @@ def book_cover(book_id):
 
 
 @app_routes.route("/admin/book/delete/<int:book_id>", methods=["POST"])
+@require_book_management
 def delete_book(book_id):
-    if not is_logged_in() or not has_book_management_access():
-        flash("Accesso negato!")
-        return redirect(url_for("app_routes.index"))
-
-    book = Book.query.get(book_id)
+    book = db.session.get(Book, book_id)
     if book:
         try:
             semantic_book_index.remove(book.id)
@@ -205,12 +194,9 @@ def delete_book(book_id):
 
 
 @app_routes.route("/admin/book/toggle/<int:book_id>", methods=["POST"])
+@require_book_management
 def toggle_book_status(book_id):
-    if not is_logged_in() or not has_book_management_access():
-        flash("Accesso negato!")
-        return redirect(url_for("app_routes.index"))
-
-    book = Book.query.get(book_id)
+    book = db.session.get(Book, book_id)
     if book:
         book.is_active = not book.is_active
         db.session.commit()
@@ -220,11 +206,8 @@ def toggle_book_status(book_id):
 
 
 @app_routes.route("/test_email_sending/<int:schedule_id>")
+@require_book_management
 def test_email_sending(schedule_id):
-    if not is_logged_in() or not has_book_management_access():
-        flash("Accesso negato!")
-        return redirect(url_for("app_routes.index"))
-
     send_next_book_part(schedule_id)
     flash("Email inviata con successo!")
     return redirect(url_for("app_routes.manage_books"))

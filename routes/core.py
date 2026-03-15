@@ -3,9 +3,10 @@ import os
 import random
 import re
 import uuid
+from functools import wraps
 
 import chardet
-from flask import request, session
+from flask import flash, redirect, request, session, url_for
 from itsdangerous import URLSafeTimedSerializer
 from sqlalchemy import or_
 from werkzeug.security import generate_password_hash
@@ -98,6 +99,36 @@ def has_admin_access():
 
 def has_book_management_access():
     return bool(session.get("is_admin") or session.get("is_content_manager"))
+
+
+def require_login(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not is_logged_in():
+            flash("Devi effettuare il login per accedere a questa pagina.")
+            return redirect(url_for("app_routes.login"))
+        return f(*args, **kwargs)
+    return decorated
+
+
+def require_admin(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not is_logged_in() or not has_admin_access():
+            flash("Accesso negato!")
+            return redirect(url_for("app_routes.index"))
+        return f(*args, **kwargs)
+    return decorated
+
+
+def require_book_management(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not is_logged_in() or not has_book_management_access():
+            flash("Accesso negato!")
+            return redirect(url_for("app_routes.index"))
+        return f(*args, **kwargs)
+    return decorated
 
 
 def get_email_token_serializer():

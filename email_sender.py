@@ -492,6 +492,39 @@ def send_next_book_part(schedule_id):
     except Exception as error:
         db.session.rollback()
         logging.error(f"❌ Errore nel commit del database: {error}")
+        return
+
+    # 5) Se il libro è finito, invia la notifica di completamento.
+    if total_words > 0 and new_index >= total_words:
+        try:
+            send_book_completion_notification(user, book)
+            logging.info(f"✅ Notifica completamento inviata per schedule={schedule.id}")
+        except Exception as error:
+            logging.error(f"❌ Errore nell'invio della notifica di completamento: {error}")
+
+
+def send_book_completion_notification(user, book):
+    """Invia una notifica di completamento lettura all'utente tramite il canale preferito."""
+    subject = f"Hai completato '{book.title}' - BooksInPieces"
+    plain_body = (
+        f"Complimenti!\n\n"
+        f"Hai terminato la lettura di '{book.title}'.\n\n"
+        f"Torna su BooksInPieces per scegliere il tuo prossimo libro."
+    )
+    html_body = (
+        "<div style='font-family: Arial, sans-serif; line-height: 1.6;'>"
+        "<p>Complimenti!</p>"
+        f"<p>Hai terminato la lettura di <strong>{html.escape(book.title)}</strong>.</p>"
+        "<p>Torna su BooksInPieces per scegliere il tuo prossimo libro.</p>"
+        "</div>"
+    )
+    telegram_handle = user.telegram_handle
+    if user.preferred_delivery_channel == DELIVERY_TELEGRAM and telegram_handle:
+        sent = send_telegram_message(telegram_handle, f"{subject}\n\n{plain_body}")
+        if sent:
+            return
+        logging.warning("⚠️ Fallback email per notifica completamento user=%s", user.id)
+    send_email(user.email, subject, plain_body, html_body=html_body)
 
 
 def send_password_reset_email(user_email, reset_url):
