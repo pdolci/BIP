@@ -66,13 +66,13 @@
                                 <div class="small text-muted">{{ describe_frequency(schedule) }}</div>
                             </div>
                             <span class="badge {% if schedule.is_paused %}text-bg-warning{% else %}text-bg-success{% endif %}">
-                                {% if schedule.is_paused %}In pausa{% else %}Attiva{% endif %}
+                                {% if schedule.is_paused %}<i class="bi bi-pause-circle me-1"></i>In pausa{% else %}<i class="bi bi-check-circle me-1"></i>Attiva{% endif %}
                             </span>
                         </div>
                         {% if info.completion_pct is defined %}
                         <div class="mt-2 mb-1">
                             <div class="d-flex justify-content-between small text-muted mb-1">
-                                <span>Avanzamento</span>
+                                <span><i class="bi bi-bar-chart-line me-1"></i>Avanzamento</span>
                                 <span>{{ info.completion_pct }}%</span>
                             </div>
                             <div class="progress" style="height: 6px;">
@@ -80,15 +80,15 @@
                             </div>
                         </div>
                         {% endif %}
-                        <div class="small text-muted">Canale: {{ describe_delivery_channel(schedule) }}</div>
+                        <div class="small text-muted"><i class="bi bi-send me-1"></i>Canale: {{ describe_delivery_channel(schedule) }}</div>
                         {% if schedule.next_send_date %}
-                        <div class="small text-muted">Prossimo invio: {{ format_app_datetime(schedule.next_send_date) }}</div>
+                        <div class="small text-muted"><i class="bi bi-calendar-check me-1"></i>Prossimo invio: {{ format_app_datetime(schedule.next_send_date) }}</div>
                         {% endif %}
                         {% if info.words_next is defined %}
-                        <div class="small text-muted">Parole prossima consegna: ~{{ info.words_next }}</div>
+                        <div class="small text-muted"><i class="bi bi-fonts me-1"></i>Parole prossima consegna: ~{{ info.words_next }}</div>
                         {% endif %}
                         {% if schedule.travel_pause_until %}
-                        <div class="small text-warning">Modalità viaggio fino al {{ format_app_datetime(schedule.travel_pause_until) }}</div>
+                        <div class="small text-warning"><i class="bi bi-airplane me-1"></i>Modalità viaggio fino al {{ format_app_datetime(schedule.travel_pause_until) }}</div>
                         {% endif %}
 
                         <div class="d-flex flex-wrap gap-2 mt-3">
