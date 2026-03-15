@@ -40,10 +40,12 @@
                     <thead class="table-light">
                         <tr>
                             <th>Utente</th>
-                            <th>Contatti</th>
                             <th>Libro / Pianificazione</th>
                             <th>Stato</th>
-                            <th class="text-end">Manutenzione</th>
+                            <th class="text-end" style="white-space:nowrap">
+                                <span class="text-muted small">Utente</span>
+                                <span class="text-muted small ms-3">Pianificazione</span>
+                            </th>
                         </tr>
                     </thead>
                     <tbody>
@@ -52,22 +54,24 @@
                                 {% for schedule in user.schedules %}
                                     <tr>
                                         <td>
-                                            <strong>{{ user.email }}</strong>
-                                            <div class="small text-muted">ID utente: {{ user.id }}</div>
-                                            {% if user.is_admin %}<span class="badge bg-danger me-1">Admin</span>{% endif %}
-                                            {% if user.is_content_manager %}<span class="badge bg-info">Content</span>{% endif %}
-                                        </td>
-                                        <td class="small">
-                                            <div>Canale preferito: <strong>{{ user.preferred_delivery_channel|upper }}</strong></div>
-                                            <div>Telegram: {{ user.telegram_handle or 'n/d' }}</div>
+                                            <div class="fw-semibold">{{ user.email }}</div>
+                                            <div class="small text-muted">
+                                                {% if user.preferred_delivery_channel == 'telegram' %}
+                                                    <i class="bi bi-telegram me-1"></i>{{ user.telegram_handle or 'n/d' }}
+                                                {% else %}
+                                                    <i class="bi bi-envelope me-1"></i>email
+                                                {% endif %}
+                                                {% if user.is_admin %}<span class="badge bg-danger ms-1">Admin</span>{% endif %}
+                                                {% if user.is_content_manager %}<span class="badge bg-info ms-1">Content</span>{% endif %}
+                                            </div>
                                         </td>
                                         <td>
-                                            <strong>{{ schedule.book.title if schedule.book else 'Libro non disponibile' }}</strong>
+                                            <div class="fw-semibold">{{ schedule.book.title if schedule.book else 'Libro non disponibile' }}</div>
                                             <div class="small text-muted">
                                                 {{ describe_frequency(schedule) }} · {{ describe_delivery_channel(schedule) }}
                                             </div>
                                             <div class="small text-muted">
-                                                Ultimo indice inviato: {{ schedule.last_sent_index }} · Prossimo invio: {{ format_app_datetime(schedule.next_send_date) }}
+                                                indice {{ schedule.last_sent_index }} · {{ format_app_datetime(schedule.next_send_date) }}
                                             </div>
                                         </td>
                                         <td>
@@ -80,39 +84,54 @@
                                             {% endif %}
                                         </td>
                                         <td class="text-end">
-                                            <div class="d-flex flex-wrap justify-content-end gap-2">
-                                                <!-- Anagrafica utente -->
-                                                <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#editUserModal_{{ user.id }}">
-                                                    Anagrafica
+                                            <div class="d-flex justify-content-end align-items-center gap-1">
+                                                {# — Azioni utente — #}
+                                                <button class="btn btn-sm btn-icon btn-outline-secondary"
+                                                    data-bs-toggle="modal" data-bs-target="#editUserModal_{{ user.id }}"
+                                                    data-bs-toggle2="tooltip" data-bs-placement="top" data-bs-title="Modifica anagrafica"
+                                                    title="Modifica anagrafica">
+                                                    <i class="bi bi-person-gear"></i>
                                                 </button>
-                                                <!-- Reset password -->
-                                                <form action="{{ url_for('app_routes.admin_reset_user_password', user_id=user.id) }}" method="post" class="d-flex gap-1">
+                                                <form action="{{ url_for('app_routes.admin_delete_user', user_id=user.id) }}" method="post"
+                                                    onsubmit="return confirm('Eliminare definitivamente {{ user.email }} e tutti i suoi dati?');">
                                                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                                    <input type="password" name="new_password" class="form-control form-control-sm" placeholder="Nuova password" minlength="8" maxlength="15" pattern="(?=.*[A-Za-z])(?=.*\d)(?=.*[!£$%&^])[A-Za-z\d!£$%&^]{8,15}" title="8-15 caratteri, con almeno una lettera, un numero e un simbolo tra !£$%&^." required>
-                                                    <button class="btn btn-sm btn-outline-dark" type="submit">Reset password</button>
+                                                    <button type="submit" class="btn btn-sm btn-icon btn-outline-danger"
+                                                        title="Elimina utente">
+                                                        <i class="bi bi-person-x"></i>
+                                                    </button>
                                                 </form>
-                                                <!-- Elimina utente -->
-                                                <form action="{{ url_for('app_routes.admin_delete_user', user_id=user.id) }}" method="post" onsubmit="return confirm('Confermi la cancellazione definitiva di {{ user.email }}?');">
-                                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                                    <button class="btn btn-sm btn-danger" type="submit">Elimina utente</button>
-                                                </form>
-                                                <!-- Azioni pianificazione -->
+
+                                                <span class="text-muted mx-1">|</span>
+
+                                                {# — Azioni pianificazione — #}
                                                 <form action="{{ url_for('app_routes.admin_toggle_pause_schedule', schedule_id=schedule.id) }}" method="post">
                                                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                                    <button class="btn btn-sm btn-outline-warning" type="submit">{{ 'Riprendi' if schedule.is_paused else 'Pausa' }}</button>
+                                                    <button type="submit" class="btn btn-sm btn-icon btn-outline-warning"
+                                                        title="{{ 'Riprendi pianificazione' if schedule.is_paused else 'Metti in pausa' }}">
+                                                        <i class="bi bi-{{ 'play-circle' if schedule.is_paused else 'pause-circle' }}"></i>
+                                                    </button>
                                                 </form>
                                                 <form action="{{ url_for('app_routes.admin_recompute_schedule', schedule_id=schedule.id) }}" method="post">
                                                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                                    <button class="btn btn-sm btn-outline-primary" type="submit">Ricalcola invio</button>
+                                                    <button type="submit" class="btn btn-sm btn-icon btn-outline-primary"
+                                                        title="Ricalcola prossimo invio">
+                                                        <i class="bi bi-arrow-clockwise"></i>
+                                                    </button>
                                                 </form>
                                                 <form action="{{ url_for('app_routes.admin_reset_schedule_progress', schedule_id=schedule.id) }}" method="post">
                                                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                                    <button class="btn btn-sm btn-outline-danger" type="submit">Reset progresso</button>
+                                                    <button type="submit" class="btn btn-sm btn-icon btn-outline-secondary"
+                                                        title="Reset progresso lettura">
+                                                        <i class="bi bi-skip-backward-circle"></i>
+                                                    </button>
                                                 </form>
-                                                <!-- Elimina pianificazione -->
-                                                <form action="{{ url_for('app_routes.admin_delete_schedule', schedule_id=schedule.id) }}" method="post" onsubmit="return confirm('Eliminare la pianificazione di «{{ schedule.book.title if schedule.book else 'questo libro' }}» per {{ user.email }}?');">
+                                                <form action="{{ url_for('app_routes.admin_delete_schedule', schedule_id=schedule.id) }}" method="post"
+                                                    onsubmit="return confirm('Eliminare la pianificazione di «{{ schedule.book.title if schedule.book else 'questo libro' }}» per {{ user.email }}?');">
                                                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                                    <button class="btn btn-sm btn-danger" type="submit">Elimina pianificazione</button>
+                                                    <button type="submit" class="btn btn-sm btn-icon btn-outline-danger"
+                                                        title="Elimina pianificazione">
+                                                        <i class="bi bi-calendar-x"></i>
+                                                    </button>
                                                 </form>
                                             </div>
                                         </td>
@@ -121,33 +140,33 @@
                             {% else %}
                                 <tr>
                                     <td>
-                                        <strong>{{ user.email }}</strong>
-                                        <div class="small text-muted">ID utente: {{ user.id }}</div>
-                                        {% if user.is_admin %}<span class="badge bg-danger me-1">Admin</span>{% endif %}
-                                        {% if user.is_content_manager %}<span class="badge bg-info">Content</span>{% endif %}
+                                        <div class="fw-semibold">{{ user.email }}</div>
+                                        <div class="small text-muted">
+                                            {% if user.preferred_delivery_channel == 'telegram' %}
+                                                <i class="bi bi-telegram me-1"></i>{{ user.telegram_handle or 'n/d' }}
+                                            {% else %}
+                                                <i class="bi bi-envelope me-1"></i>email
+                                            {% endif %}
+                                            {% if user.is_admin %}<span class="badge bg-danger ms-1">Admin</span>{% endif %}
+                                            {% if user.is_content_manager %}<span class="badge bg-info ms-1">Content</span>{% endif %}
+                                        </div>
                                     </td>
-                                    <td class="small">
-                                        <div>Canale preferito: <strong>{{ user.preferred_delivery_channel|upper }}</strong></div>
-                                        <div>Telegram: {{ user.telegram_handle or 'n/d' }}</div>
-                                    </td>
-                                    <td class="text-muted">Nessun libro schedulato.</td>
+                                    <td class="text-muted small">Nessun libro pianificato.</td>
                                     <td></td>
                                     <td class="text-end">
-                                        <div class="d-flex flex-wrap justify-content-end gap-2">
-                                            <!-- Anagrafica utente -->
-                                            <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#editUserModal_{{ user.id }}">
-                                                Anagrafica
+                                        <div class="d-flex justify-content-end align-items-center gap-1">
+                                            <button class="btn btn-sm btn-icon btn-outline-secondary"
+                                                data-bs-toggle="modal" data-bs-target="#editUserModal_{{ user.id }}"
+                                                title="Modifica anagrafica">
+                                                <i class="bi bi-person-gear"></i>
                                             </button>
-                                            <!-- Reset password -->
-                                            <form action="{{ url_for('app_routes.admin_reset_user_password', user_id=user.id) }}" method="post" class="d-flex gap-1">
+                                            <form action="{{ url_for('app_routes.admin_delete_user', user_id=user.id) }}" method="post"
+                                                onsubmit="return confirm('Eliminare definitivamente {{ user.email }} e tutti i suoi dati?');">
                                                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                                <input type="password" name="new_password" class="form-control form-control-sm" placeholder="Nuova password" minlength="8" maxlength="15" pattern="(?=.*[A-Za-z])(?=.*\d)(?=.*[!£$%&^])[A-Za-z\d!£$%&^]{8,15}" title="8-15 caratteri, con almeno una lettera, un numero e un simbolo tra !£$%&^." required>
-                                                <button class="btn btn-sm btn-outline-dark" type="submit">Reset password</button>
-                                            </form>
-                                            <!-- Elimina utente -->
-                                            <form action="{{ url_for('app_routes.admin_delete_user', user_id=user.id) }}" method="post" onsubmit="return confirm('Confermi la cancellazione definitiva di {{ user.email }}?');">
-                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                                <button class="btn btn-sm btn-danger" type="submit">Elimina utente</button>
+                                                <button type="submit" class="btn btn-sm btn-icon btn-outline-danger"
+                                                    title="Elimina utente">
+                                                    <i class="bi bi-person-x"></i>
+                                                </button>
                                             </form>
                                         </div>
                                     </td>
@@ -187,45 +206,82 @@
     </div>
 </div>
 
-<!-- Modali anagrafica utenti -->
+<!-- Modali anagrafica + password utenti -->
 {% for user in users %}
 <div class="modal fade" id="editUserModal_{{ user.id }}" tabindex="-1" aria-labelledby="editUserModalLabel_{{ user.id }}" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
-            <form action="{{ url_for('app_routes.admin_edit_user', user_id=user.id) }}" method="post">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="editUserModalLabel_{{ user.id }}">Modifica anagrafica — {{ user.email }}</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Chiudi"></button>
-                </div>
-                <div class="modal-body">
+            <div class="modal-header">
+                <h5 class="modal-title" id="editUserModalLabel_{{ user.id }}">
+                    <i class="bi bi-person-gear me-2"></i>{{ user.email }}
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Chiudi"></button>
+            </div>
+            <div class="modal-body p-0">
+                <!-- Sezione anagrafica -->
+                <form action="{{ url_for('app_routes.admin_edit_user', user_id=user.id) }}" method="post" class="p-3 border-bottom">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <p class="small text-uppercase text-muted fw-semibold mb-2">Dati account</p>
                     <div class="mb-3">
-                        <label class="form-label fw-semibold">Email</label>
-                        <input type="email" name="email" class="form-control" value="{{ user.email }}" required>
+                        <label class="form-label small">Email</label>
+                        <input type="email" name="email" class="form-control form-control-sm" value="{{ user.email }}" required>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label fw-semibold">Handle Telegram</label>
-                        <input type="text" name="telegram_handle" class="form-control" placeholder="@username" value="{{ user.telegram_handle or '' }}">
-                        <div class="form-text">Lascia vuoto per rimuoverlo.</div>
+                        <label class="form-label small">Handle Telegram</label>
+                        <input type="text" name="telegram_handle" class="form-control form-control-sm" placeholder="@username" value="{{ user.telegram_handle or '' }}">
                     </div>
-                    <div class="mb-2">
+                    <div class="mb-3 d-flex gap-3">
                         <div class="form-check">
                             <input class="form-check-input" type="checkbox" name="is_admin" value="1" id="isAdmin_{{ user.id }}" {% if user.is_admin %}checked{% endif %}>
-                            <label class="form-check-label" for="isAdmin_{{ user.id }}">Amministratore</label>
+                            <label class="form-check-label small" for="isAdmin_{{ user.id }}">Amministratore</label>
                         </div>
                         <div class="form-check">
                             <input class="form-check-input" type="checkbox" name="is_content_manager" value="1" id="isContent_{{ user.id }}" {% if user.is_content_manager %}checked{% endif %}>
-                            <label class="form-check-label" for="isContent_{{ user.id }}">Gestore contenuti</label>
+                            <label class="form-check-label small" for="isContent_{{ user.id }}">Gestore contenuti</label>
                         </div>
                     </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
-                    <button type="submit" class="btn btn-primary">Salva modifiche</button>
-                </div>
-            </form>
+                    <button type="submit" class="btn btn-sm btn-primary w-100">
+                        <i class="bi bi-floppy me-1"></i>Salva anagrafica
+                    </button>
+                </form>
+                <!-- Sezione reset password -->
+                <form action="{{ url_for('app_routes.admin_reset_user_password', user_id=user.id) }}" method="post" class="p-3">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <p class="small text-uppercase text-muted fw-semibold mb-2">Cambia password</p>
+                    <div class="mb-2">
+                        <input type="password" name="new_password" class="form-control form-control-sm"
+                            placeholder="Nuova password (8-15 car., lettera+numero+simbolo)"
+                            minlength="8" maxlength="15"
+                            pattern="(?=.*[A-Za-z])(?=.*\d)(?=.*[!£$%&^])[A-Za-z\d!£$%&^]{8,15}"
+                            title="8-15 caratteri, con almeno una lettera, un numero e un simbolo tra !£$%&^." required>
+                    </div>
+                    <button type="submit" class="btn btn-sm btn-outline-dark w-100">
+                        <i class="bi bi-key me-1"></i>Imposta password
+                    </button>
+                </form>
+            </div>
         </div>
     </div>
 </div>
 {% endfor %}
+
+<style>
+.btn-icon {
+    width: 2rem;
+    height: 2rem;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: .95rem;
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('[title]').forEach(function (el) {
+        new bootstrap.Tooltip(el, { trigger: 'hover', delay: { show: 200, hide: 0 } });
+    });
+});
+</script>
 {% endblock %}
