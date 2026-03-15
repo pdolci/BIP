@@ -1,13 +1,15 @@
-import logging
 import os
 
 from flask import abort, flash, redirect, render_template, request, send_from_directory, url_for
 from werkzeug.utils import secure_filename
 
+from bip_logging import get_logger
 from email_sender import count_total_words, send_next_book_part
 from extensions import db
 from models import Book
 from semantic_search import build_and_store_book_embedding, semantic_book_index
+
+logger = get_logger(__name__)
 
 from . import app_routes
 from .core import (
@@ -54,11 +56,11 @@ def upload_book():
             extension = filename.rsplit(".", 1)[1].lower() if "." in filename else ""
             _sanitize_uploaded_book_file(file_path, extension)
             if not os.path.isfile(file_path):
-                logging.error("❌ File non trovato dopo il salvataggio: %s", file_path)
+                logger.error("❌ File non trovato dopo il salvataggio: %s", file_path)
                 flash("Errore nel caricamento: inserisci il nome del libro e un file valido.")
                 return redirect(url_for("app_routes.manage_books"))
         except Exception as error:
-            logging.error("❌ Errore durante il salvataggio/sanitizzazione del file: %s", error)
+            logger.error("❌ Errore durante il salvataggio/sanitizzazione del file: %s", error)
             flash("Errore nel caricamento: inserisci il nome del libro e un file valido.")
             return redirect(url_for("app_routes.manage_books"))
 
