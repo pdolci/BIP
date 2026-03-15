@@ -63,59 +63,74 @@
                         <div class="d-flex justify-content-between align-items-start">
                             <div>
                                 <h6 class="mb-1">{{ schedule.book.title }}</h6>
-                                <div class="small text-muted">{{ describe_frequency(schedule) }}</div>
+                                <div class="small text-muted">
+                                    <i class="bi bi-calendar-event me-1" title="Frequenza di consegna"></i>{{ describe_frequency(schedule) }}
+                                </div>
                             </div>
-                            <span class="badge {% if schedule.is_paused %}text-bg-warning{% else %}text-bg-success{% endif %}">
-                                {% if schedule.is_paused %}<i class="bi bi-pause-circle me-1"></i>In pausa{% else %}<i class="bi bi-check-circle me-1"></i>Attiva{% endif %}
+                            <span class="badge {% if schedule.is_paused %}text-bg-warning{% else %}text-bg-success{% endif %}"
+                                  title="{% if schedule.is_paused %}Sottoscrizione in pausa{% else %}Sottoscrizione attiva{% endif %}">
+                                {% if schedule.is_paused %}<i class="bi bi-pause-circle"></i>{% else %}<i class="bi bi-check-circle"></i>{% endif %}
                             </span>
                         </div>
                         {% if info.completion_pct is defined %}
                         <div class="mt-2 mb-1">
                             <div class="d-flex justify-content-between small text-muted mb-1">
-                                <span><i class="bi bi-bar-chart-line me-1"></i>Avanzamento</span>
-                                <span>{{ info.completion_pct }}%</span>
+                                <span><i class="bi bi-bar-chart-line me-1" title="Avanzamento lettura"></i>{{ info.completion_pct }}%</span>
                             </div>
                             <div class="progress" style="height: 6px;">
                                 <div class="progress-bar {% if info.completion_pct >= 100 %}bg-success{% endif %}" role="progressbar" style="width: {{ [info.completion_pct, 100]|min }}%;"></div>
                             </div>
                         </div>
                         {% endif %}
-                        <div class="small text-muted"><i class="bi bi-send me-1"></i>Canale: {{ describe_delivery_channel(schedule) }}</div>
-                        {% if schedule.next_send_date %}
-                        <div class="small text-muted"><i class="bi bi-calendar-check me-1"></i>Prossimo invio: {{ format_app_datetime(schedule.next_send_date) }}</div>
-                        {% endif %}
-                        {% if info.words_next is defined %}
-                        <div class="small text-muted"><i class="bi bi-fonts me-1"></i>Parole prossima consegna: ~{{ info.words_next }}</div>
-                        {% endif %}
+                        <div class="small text-muted mt-1">
+                            <i class="bi bi-send me-1" title="Canale di consegna"></i>{{ describe_delivery_channel(schedule) }}
+                            {% if schedule.next_send_date %}
+                            · <i class="bi bi-calendar-check me-1" title="Prossimo invio"></i>{{ format_app_datetime(schedule.next_send_date) }}
+                            {% endif %}
+                            {% if info.words_next is defined %}
+                            · <i class="bi bi-fonts me-1" title="Parole nella prossima consegna"></i>~{{ info.words_next }}
+                            {% endif %}
+                        </div>
                         {% if schedule.travel_pause_until %}
-                        <div class="small text-warning"><i class="bi bi-airplane me-1"></i>Modalità viaggio fino al {{ format_app_datetime(schedule.travel_pause_until) }}</div>
+                        <div class="small text-warning mt-1">
+                            <i class="bi bi-airplane me-1" title="Modalità viaggio attiva"></i>{{ format_app_datetime(schedule.travel_pause_until) }}
+                        </div>
                         {% endif %}
 
-                        <div class="d-flex flex-wrap gap-2 mt-3">
+                        <div class="d-flex flex-wrap gap-1 mt-3">
                             <form action="{{ url_for('app_routes.pause_schedule', schedule_id=schedule.id) }}" method="post" class="d-inline">
                                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                <button type="submit" class="btn btn-warning btn-sm">
-                                    {% if schedule.is_paused %}<i class="bi bi-play-fill"></i> Riprendi{% else %}<i class="bi bi-pause-fill"></i> Pausa{% endif %}
+                                <button type="submit" class="btn btn-sm btn-icon btn-warning"
+                                    title="{% if schedule.is_paused %}Riprendi sottoscrizione{% else %}Metti in pausa{% endif %}">
+                                    {% if schedule.is_paused %}<i class="bi bi-play-fill"></i>{% else %}<i class="bi bi-pause-fill"></i>{% endif %}
                                 </button>
                             </form>
                             <form action="{{ url_for('app_routes.snooze_schedule', schedule_id=schedule.id) }}" method="post" class="d-inline">
                                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                 <input type="hidden" name="action" value="skip_next">
-                                <button type="submit" class="btn btn-outline-secondary btn-sm"><i class="bi bi-skip-forward me-1"></i>Salta prossima</button>
+                                <button type="submit" class="btn btn-sm btn-icon btn-outline-secondary" title="Salta la prossima consegna">
+                                    <i class="bi bi-skip-forward"></i>
+                                </button>
                             </form>
                             <form action="{{ url_for('app_routes.snooze_schedule', schedule_id=schedule.id) }}" method="post" class="d-inline">
                                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                 <input type="hidden" name="action" value="delay_24h">
-                                <button type="submit" class="btn btn-outline-secondary btn-sm"><i class="bi bi-clock-history me-1"></i>Rimanda 24h</button>
+                                <button type="submit" class="btn btn-sm btn-icon btn-outline-secondary" title="Rimanda di 24 ore">
+                                    <i class="bi bi-clock-history"></i>
+                                </button>
                             </form>
-                            <form action="{{ url_for('app_routes.travel_mode_schedule', schedule_id=schedule.id) }}" method="post" class="d-flex gap-2 align-items-center">
+                            <form action="{{ url_for('app_routes.travel_mode_schedule', schedule_id=schedule.id) }}" method="post" class="d-flex gap-1 align-items-center">
                                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                <input type="number" name="travel_days" class="form-control form-control-sm" min="1" value="7" style="max-width: 90px;">
-                                <button type="submit" class="btn btn-outline-warning btn-sm"><i class="bi bi-airplane me-1"></i>Viaggio</button>
+                                <input type="number" name="travel_days" class="form-control form-control-sm" min="1" value="7" style="max-width: 70px;" title="Giorni di pausa viaggio">
+                                <button type="submit" class="btn btn-sm btn-icon btn-outline-warning" title="Attiva modalità viaggio">
+                                    <i class="bi bi-airplane"></i>
+                                </button>
                             </form>
                             <form action="{{ url_for('app_routes.delete_schedule', schedule_id=schedule.id) }}" method="post" class="d-inline">
                                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                <button type="submit" class="btn btn-danger btn-sm"><i class="bi bi-trash"></i> Cancella</button>
+                                <button type="submit" class="btn btn-sm btn-icon btn-outline-danger" title="Cancella sottoscrizione">
+                                    <i class="bi bi-trash"></i>
+                                </button>
                             </form>
                         </div>
                     </div>
@@ -128,4 +143,12 @@
         </div>
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('[title]').forEach(function (el) {
+        new bootstrap.Tooltip(el, { trigger: 'hover', delay: { show: 200, hide: 0 } });
+    });
+});
+</script>
 {% endblock %}
