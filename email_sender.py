@@ -1,3 +1,4 @@
+import calendar
 import hashlib
 import hmac
 import html
@@ -31,15 +32,12 @@ DELIVERY_TELEGRAM = "telegram"
 SUPPORTED_DELIVERY_CHANNELS = {DELIVERY_EMAIL, DELIVERY_TELEGRAM}
 TELEGRAM_MAX_MESSAGE_LENGTH = 4000
 
-_DELIVER_NOW_EXPIRY_SECONDS = 48 * 3600  # il link è valido 48 ore
-
-
 def _deliver_now_sign(payload: str) -> str:
     return hmac.new(Config.SECRET_KEY.encode(), payload.encode(), hashlib.sha256).hexdigest()
 
 
-def generate_deliver_now_token(schedule_id: int, user_id: int) -> str:
-    expiry = int(_time.time()) + _DELIVER_NOW_EXPIRY_SECONDS
+def generate_deliver_now_token(schedule_id: int, user_id: int, expiry: int) -> str:
+    """Genera un token firmato valido fino a ``expiry`` (Unix timestamp UTC)."""
     payload = f"{schedule_id}:{user_id}:{expiry}"
     sig = _deliver_now_sign(payload)
     return urlsafe_b64encode(f"{payload}:{sig}".encode()).decode()
@@ -497,7 +495,12 @@ def send_next_book_part(schedule_id):
     # 3) Se configurato, aggiunge il link "ricevi subito il prossimo estratto".
     base_url = Config.APP_BASE_URL
     if base_url:
-        token = generate_deliver_now_token(schedule.id, user.id)
+        # Il token scade 1 minuto prima del prossimo invio pianificato,
+        # così il link non è più cliccabile dopo che la consegna automatica
+        # è già avvenuta (evita estratti doppi).
+        next_send = compute_next_send_utc(schedule, utc_now_naive(), allow_immediate=False)
+        token_expiry = int(calendar.timegm(next_send.timetuple())) - 60
+        token = generate_deliver_now_token(schedule.id, user.id, token_expiry)
         deliver_url = f"{base_url}/deliver_now/{token}"
         text_payload += f"\n\n---\nVuoi continuare subito? {deliver_url}"
         html_payload += (
