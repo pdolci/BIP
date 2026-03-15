@@ -494,7 +494,7 @@ def send_next_book_part(schedule_id):
 
     # 3) Se configurato, aggiunge il link "ricevi subito il prossimo estratto".
     base_url = Config.APP_BASE_URL
-    logger.debug(f"deliver_now footer: APP_BASE_URL={repr(base_url)}")
+    logger.info(f"deliver_now footer: APP_BASE_URL={repr(base_url)}")
     if base_url:
         # Il token scade 1 minuto prima del prossimo invio pianificato,
         # così il link non è più cliccabile dopo che la consegna automatica
