@@ -299,3 +299,14 @@ body {
     }
 
 }
+
+/* Pulsanti icona quadrati — usati nei pannelli di amministrazione */
+.btn-icon {
+    width: 2rem;
+    height: 2rem;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: .95rem;
+}
