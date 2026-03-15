@@ -136,19 +136,14 @@ def configure_reading(book_id):
         weekdays_selected = request.form.getlist("weekdays") or request.form.getlist("frequency_weekdays")
         default_channel = (current_user.preferred_delivery_channel if current_user else DELIVERY_EMAIL)
         delivery_channel = (request.form.get("delivery_channel") or default_channel).strip().lower()
-        telegram_handle = (request.form.get("telegram_handle") or "").strip()
 
         if delivery_channel not in SUPPORTED_DELIVERY_CHANNELS:
             flash("Canale di consegna non valido.")
             return redirect(url_for("app_routes.configure_reading", book_id=book_id))
 
-        resolved_telegram_handle = telegram_handle or (current_user.telegram_handle if current_user else "")
-        if delivery_channel == DELIVERY_TELEGRAM and not resolved_telegram_handle:
-            flash("Inserisci il tuo handle Telegram per ricevere i pezzi su Telegram.")
+        if delivery_channel == DELIVERY_TELEGRAM and not (current_user and current_user.telegram_handle):
+            flash("Aggiungi il tuo handle Telegram nel profilo per usare questo canale.")
             return redirect(url_for("app_routes.configure_reading", book_id=book_id))
-
-        if telegram_handle and current_user:
-            current_user.telegram_handle = telegram_handle
 
         active_subscriptions = sum(1 for schedule in active_schedules if not schedule.is_paused)
         if active_subscriptions >= MAX_ACTIVE_SUBSCRIPTIONS:

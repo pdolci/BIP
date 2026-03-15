@@ -166,28 +166,28 @@
                 <div class="mb-4">
                     <div class="section-label">Ricevi via</div>
                     <div class="chan-picker">
-                        <input type="radio" name="delivery_channel" value="{{ delivery_email }}" id="chan-email" {% if default_delivery_channel == delivery_email %}checked{% endif %}>
+                        <input type="radio" name="delivery_channel" value="{{ delivery_email }}" id="chan-email" {% if default_delivery_channel == delivery_email or not session_telegram_handle %}checked{% endif %}>
                         <label class="chan-label" for="chan-email"><i class="bi bi-envelope me-1"></i>Email</label>
+                        {% if session_telegram_handle %}
                         <input type="radio" name="delivery_channel" value="{{ delivery_telegram }}" id="chan-telegram" {% if default_delivery_channel == delivery_telegram %}checked{% endif %}>
                         <label class="chan-label" for="chan-telegram"><i class="bi bi-telegram me-1"></i>Telegram</label>
+                        {% else %}
+                        <span class="chan-label opacity-50" title="Aggiungi il tuo handle Telegram nel profilo per abilitare questa opzione" style="cursor:default;">
+                            <i class="bi bi-telegram me-1"></i>Telegram
+                        </span>
+                        {% endif %}
                     </div>
-                </div>
-
-                <!-- TELEGRAM HANDLE -->
-                <div class="mb-4 d-none" id="telegram-group">
-                    <div class="section-label">Handle Telegram</div>
-                    <input
-                        type="text"
-                        name="telegram_handle"
-                        id="telegram-handle"
-                        class="form-control text-center"
-                        placeholder="@username"
-                        value="{{ session_telegram_handle or '' }}"
-                    >
+                    {% if not session_telegram_handle %}
+                    <div class="text-center mt-2">
+                        <small class="text-muted">
+                            <a href="{{ url_for('app_routes.profile') }}" class="text-muted">Configura Telegram nel profilo</a> per abilitare la consegna via Telegram.
+                        </small>
+                    </div>
+                    {% endif %}
                 </div>
 
                 <button type="submit" class="btn btn-primary w-100 py-2 fw-semibold mt-1">
-                    <i class="bi bi-alarm me-2"></i>Imposta allarme
+                    <i class="bi bi-book me-2"></i>Imposta Lettura
                 </button>
             </form>
         </div>
@@ -195,20 +195,11 @@
 </div>
 
 <script>
-const chanTelegram = document.getElementById("chan-telegram");
-const chanEmail    = document.getElementById("chan-email");
-const telegramGrp  = document.getElementById("telegram-group");
-
-const syncChannel = () => telegramGrp.classList.toggle("d-none", !chanTelegram.checked);
-chanTelegram.addEventListener("change", syncChannel);
-chanEmail.addEventListener("change", syncChannel);
-syncChannel();
-
 document.getElementById("alarm-form").addEventListener("submit", e => {
     const checked = document.querySelectorAll('input[name="weekdays"]:checked');
     if (checked.length === 0) {
         e.preventDefault();
-        checked.length === 0 && document.querySelector(".day-picker").scrollIntoView({ behavior: "smooth" });
+        document.querySelector(".day-picker").scrollIntoView({ behavior: "smooth" });
         alert("Seleziona almeno un giorno della settimana.");
     }
 });
