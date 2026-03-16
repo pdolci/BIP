@@ -18,6 +18,7 @@ Utilizzo base:
 import logging
 import logging.handlers
 import os
+import socket
 import threading
 import time
 
@@ -115,18 +116,21 @@ def setup_logging(app) -> logging.Logger:
     # append_nul=False: il byte \x00 finale non è richiesto da journald e
     # può causare problemi su alcune versioni.
     if os.path.exists(_JOURNALD_SOCKET):
+        _syslog_path = _JOURNALD_SOCKET
         syslog_handler: logging.Handler = logging.handlers.SysLogHandler(
             address=_JOURNALD_SOCKET,
             facility=logging.handlers.SysLogHandler.LOG_LOCAL0,
-            socktype=__import__("socket").SOCK_DGRAM,
+            socktype=socket.SOCK_DGRAM,
         )
     elif os.path.exists(_SYSLOG_SOCKET):
+        _syslog_path = _SYSLOG_SOCKET
         syslog_handler = logging.handlers.SysLogHandler(
             address=_SYSLOG_SOCKET,
             facility=logging.handlers.SysLogHandler.LOG_LOCAL0,
         )
     else:
         # Fallback: UDP 514 (macOS, container senza journald, ecc.)
+        _syslog_path = "udp://localhost:514"
         syslog_handler = logging.handlers.SysLogHandler(address=("localhost", 514))
 
     syslog_handler.append_nul = False
@@ -145,6 +149,10 @@ def setup_logging(app) -> logging.Logger:
     stderr_handler.setFormatter(stderr_fmt)
     stderr_handler.addFilter(dyn_filter)
     logger.addHandler(stderr_handler)
+
+    # Primo messaggio di avvio: conferma quale socket è in uso e che il
+    # logger funziona. Visibile sia in journalctl -t bip che -u <servizio>.
+    logger.info("Logging avviato — syslog_socket=%s pid=%d", _syslog_path, os.getpid())
 
     return logger
 
