@@ -25,8 +25,12 @@ import time
 
 APP_NAME = "bip"
 
-# Socket Unix di syslog/journald su Linux; fallback a UDP 514 altrove.
-_SYSLOG_SOCKET = "/dev/log"
+# Socket di journald (protocollo syslog nativo) e fallback classico.
+# /run/systemd/journal/dev-log è il socket diretto di journald e bypassa
+# rsyslog, garantendo che i messaggi appaiano in journalctl -t bip.
+# /dev/log può puntare a rsyslog su alcune configurazioni.
+_JOURNALD_SOCKET = "/run/systemd/journal/dev-log"
+_SYSLOG_SOCKET   = "/dev/log"
 
 # Livelli esposti all'amministratore (in ordine crescente di severità).
 LEVELS: dict[str, int] = {
@@ -106,9 +110,18 @@ def setup_logging(app) -> logging.Logger:
     # Il nome del logger (modulo) va nel corpo del messaggio.
     fmt = logging.Formatter(f"{APP_NAME}[%(process)d]: %(levelname)s %(name)s %(message)s")
 
-    # Handler syslog/journald — l'OS gestisce rotazione, compressione e indice.
-    if os.path.exists(_SYSLOG_SOCKET):
+    # ── Handler syslog/journald ──────────────────────────────────────────────
+    # Priorità socket: journald nativo → /dev/log → UDP 514 (ultimo fallback).
+    # append_nul=False: il byte \x00 finale non è richiesto da journald e
+    # può causare problemi su alcune versioni.
+    if os.path.exists(_JOURNALD_SOCKET):
         syslog_handler: logging.Handler = logging.handlers.SysLogHandler(
+            address=_JOURNALD_SOCKET,
+            facility=logging.handlers.SysLogHandler.LOG_LOCAL0,
+            socktype=__import__("socket").SOCK_DGRAM,
+        )
+    elif os.path.exists(_SYSLOG_SOCKET):
+        syslog_handler = logging.handlers.SysLogHandler(
             address=_SYSLOG_SOCKET,
             facility=logging.handlers.SysLogHandler.LOG_LOCAL0,
         )
@@ -116,17 +129,22 @@ def setup_logging(app) -> logging.Logger:
         # Fallback: UDP 514 (macOS, container senza journald, ecc.)
         syslog_handler = logging.handlers.SysLogHandler(address=("localhost", 514))
 
+    syslog_handler.append_nul = False
     syslog_handler.setFormatter(fmt)
     syslog_handler.addFilter(dyn_filter)
     logger.addHandler(syslog_handler)
 
+    # ── Handler stderr ───────────────────────────────────────────────────────
+    # Sempre attivo: systemd cattura stderr del processo e lo indicizza in
+    # journald sotto l'unità di servizio (journalctl -u <nome-servizio>).
+    # Garantisce visibilità dei log anche se il SysLogHandler non funziona.
+    stderr_handler = logging.StreamHandler()
+    stderr_fmt = logging.Formatter("%(levelname)s %(name)s %(message)s")
     if app.debug:
-        stream_handler = logging.StreamHandler()
-        stream_handler.setFormatter(
-            logging.Formatter("%(asctime)s %(name)s %(levelname)s %(message)s")
-        )
-        stream_handler.addFilter(dyn_filter)
-        logger.addHandler(stream_handler)
+        stderr_fmt = logging.Formatter("%(asctime)s %(name)s %(levelname)s %(message)s")
+    stderr_handler.setFormatter(stderr_fmt)
+    stderr_handler.addFilter(dyn_filter)
+    logger.addHandler(stderr_handler)
 
     return logger
 
