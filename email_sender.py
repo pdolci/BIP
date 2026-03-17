@@ -66,7 +66,7 @@ class ContentChunk:
 
 def send_email(to, subject, body, html_body=None):
     try:
-        msg = Message(subject, sender=Config.MAIL_USERNAME, recipients=[to])
+        msg = Message(subject, sender=(Config.MAIL_SENDER_NAME, Config.MAIL_USERNAME), recipients=[to])
         msg.body = body
         if html_body:
             msg.html = html_body
