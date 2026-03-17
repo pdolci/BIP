@@ -28,7 +28,7 @@ def _load_dotenv_if_present() -> None:
                 value = value.strip().strip('"').strip("'")
 
                 if key:
-                    os.environ.setdefault(key, value)
+                    os.environ[key] = value
         break
 
 
