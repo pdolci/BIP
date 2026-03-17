@@ -112,7 +112,7 @@ def configure_reading(book_id):
     selected_book = db.session.get(Book, book_id)
     if not selected_book:
         flash("Libro non trovato.")
-        return redirect(url_for("app_routes.select_book"))
+        return redirect(url_for("app_routes.reading_center"))
 
     active_schedules = ReadingSchedule.query.options(joinedload(ReadingSchedule.book)).filter_by(user_id=user_id).all()
     current_user = db.session.get(User, user_id)
@@ -236,7 +236,7 @@ def snooze_schedule(schedule_id):
     schedule = db.session.get(ReadingSchedule, schedule_id)
     if not schedule or schedule.user_id != session["user_id"]:
         flash("Operazione non consentita.")
-        return redirect(url_for("app_routes.select_book"))
+        return redirect(url_for("app_routes.reading_center"))
 
     action = request.form.get("action")
     now = utc_now_naive()
@@ -255,7 +255,7 @@ def snooze_schedule(schedule_id):
         flash("Azione di snooze non valida.")
 
     db.session.commit()
-    return redirect(url_for("app_routes.select_book"))
+    return redirect(url_for("app_routes.reading_center"))
 
 
 @app_routes.route("/travel_mode/<int:schedule_id>", methods=["POST"])
@@ -264,38 +264,38 @@ def travel_mode(schedule_id):
     schedule = db.session.get(ReadingSchedule, schedule_id)
     if not schedule or schedule.user_id != session["user_id"]:
         flash("Operazione non consentita.")
-        return redirect(url_for("app_routes.select_book"))
+        return redirect(url_for("app_routes.reading_center"))
 
     action = request.form.get("action")
     if action == "clear":
         schedule.travel_pause_until = None
         db.session.commit()
         flash("Modalità viaggio disattivata.")
-        return redirect(url_for("app_routes.select_book"))
+        return redirect(url_for("app_routes.reading_center"))
 
     resume_date_raw = request.form.get("resume_date")
     resume_time_raw = request.form.get("resume_time")
     if not resume_date_raw:
         flash("Seleziona una data di ripartenza.")
-        return redirect(url_for("app_routes.select_book"))
+        return redirect(url_for("app_routes.reading_center"))
 
     try:
         resume_date = date.fromisoformat(resume_date_raw)
     except ValueError:
         flash("Data di ripartenza non valida.")
-        return redirect(url_for("app_routes.select_book"))
+        return redirect(url_for("app_routes.reading_center"))
 
     parsed_resume_time = parse_time_str(resume_time_raw) if resume_time_raw else None
     if resume_time_raw and parsed_resume_time is None:
         flash("Orario di ripartenza non valido. Usa un formato come 07:30.")
-        return redirect(url_for("app_routes.select_book"))
+        return redirect(url_for("app_routes.reading_center"))
 
     resume_time = parsed_resume_time or schedule.delivery_time or time(9, 0)
     resume_at = local_naive_to_utc_naive(datetime.combine(resume_date, resume_time))
 
     if resume_at <= utc_now_naive():
         flash("La ripartenza deve essere nel futuro.")
-        return redirect(url_for("app_routes.select_book"))
+        return redirect(url_for("app_routes.reading_center"))
 
     schedule.travel_pause_until = resume_at
     if schedule.next_send_date is None or schedule.next_send_date < resume_at:
@@ -303,7 +303,7 @@ def travel_mode(schedule_id):
 
     db.session.commit()
     flash("Modalità viaggio attivata.")
-    return redirect(url_for("app_routes.select_book"))
+    return redirect(url_for("app_routes.reading_center"))
 
 
 @app_routes.route("/pause_schedule/<int:schedule_id>", methods=["POST"])
@@ -323,7 +323,7 @@ def pause_schedule(schedule_id):
     else:
         flash("Operazione non consentita.")
 
-    return redirect(url_for("app_routes.select_book"))
+    return redirect(url_for("app_routes.reading_center"))
 
 
 @app_routes.route("/snooze_next_schedule/<int:schedule_id>", methods=["POST"])
@@ -332,19 +332,19 @@ def snooze_next_schedule(schedule_id):
     schedule = db.session.get(ReadingSchedule, schedule_id)
     if not schedule or schedule.user_id != session["user_id"]:
         flash("Operazione non consentita.")
-        return redirect(url_for("app_routes.select_book"))
+        return redirect(url_for("app_routes.reading_center"))
 
     total_words = _count_book_words(schedule)
     if _is_schedule_completed(schedule, total_words):
         flash("Libro già completato: non puoi rimandare ulteriormente questa consegna.")
-        return redirect(url_for("app_routes.select_book"))
+        return redirect(url_for("app_routes.reading_center"))
 
     reference = max(schedule.next_send_date, utc_now_naive())
     schedule.next_send_date = compute_next_send_utc(schedule, reference, allow_immediate=False)
     db.session.add(DeliveryEvent(schedule_id=schedule.id, event_type="skipped", words_count=0, note="Salto prossima consegna"))
     db.session.commit()
     flash("Prossima consegna saltata con successo.")
-    return redirect(url_for("app_routes.select_book"))
+    return redirect(url_for("app_routes.reading_center"))
 
 
 @app_routes.route("/snooze_24h_schedule/<int:schedule_id>", methods=["POST"])
@@ -353,18 +353,18 @@ def snooze_24h_schedule(schedule_id):
     schedule = db.session.get(ReadingSchedule, schedule_id)
     if not schedule or schedule.user_id != session["user_id"]:
         flash("Operazione non consentita.")
-        return redirect(url_for("app_routes.select_book"))
+        return redirect(url_for("app_routes.reading_center"))
 
     total_words = _count_book_words(schedule)
     if _is_schedule_completed(schedule, total_words):
         flash("Libro già completato: non puoi rimandare ulteriormente questa consegna.")
-        return redirect(url_for("app_routes.select_book"))
+        return redirect(url_for("app_routes.reading_center"))
 
     schedule.next_send_date = max(schedule.next_send_date, utc_now_naive()) + timedelta(hours=24)
     db.session.add(DeliveryEvent(schedule_id=schedule.id, event_type="skipped", words_count=0, note="Rimandata di 24 ore"))
     db.session.commit()
     flash("Consegna rimandata di 24 ore.")
-    return redirect(url_for("app_routes.select_book"))
+    return redirect(url_for("app_routes.reading_center"))
 
 
 @app_routes.route("/travel_mode_schedule/<int:schedule_id>", methods=["POST"])
@@ -373,17 +373,17 @@ def travel_mode_schedule(schedule_id):
     schedule = db.session.get(ReadingSchedule, schedule_id)
     if not schedule or schedule.user_id != session["user_id"]:
         flash("Operazione non consentita.")
-        return redirect(url_for("app_routes.select_book"))
+        return redirect(url_for("app_routes.reading_center"))
 
     try:
         travel_days = int(request.form.get("travel_days", 0) or 0)
     except (TypeError, ValueError):
         flash("Inserisci un numero di giorni valido per la modalità viaggio.")
-        return redirect(url_for("app_routes.select_book"))
+        return redirect(url_for("app_routes.reading_center"))
 
     if travel_days <= 0 or travel_days > MAX_TRAVEL_DAYS:
         flash(f"I giorni di modalità viaggio devono essere compresi tra 1 e {MAX_TRAVEL_DAYS}.")
-        return redirect(url_for("app_routes.select_book"))
+        return redirect(url_for("app_routes.reading_center"))
 
     schedule.travel_pause_until = utc_now_naive() + timedelta(days=travel_days)
     if schedule.next_send_date < schedule.travel_pause_until:
@@ -396,7 +396,7 @@ def travel_mode_schedule(schedule_id):
     ))
     db.session.commit()
     flash(f"Modalità viaggio attivata per {travel_days} giorni.")
-    return redirect(url_for("app_routes.select_book"))
+    return redirect(url_for("app_routes.reading_center"))
 
 
 @app_routes.route("/deliver_now/<token>")
@@ -449,4 +449,4 @@ def delete_schedule(schedule_id):
     else:
         flash("Operazione non consentita.")
 
-    return redirect(url_for("app_routes.select_book"))
+    return redirect(url_for("app_routes.reading_center"))
