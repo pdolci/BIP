@@ -77,6 +77,7 @@ class Config:
     MAIL_USE_TLS = os.environ.get("MAIL_USE_TLS", "true").lower() == "true"
     MAIL_USERNAME = _get_required_env("MAIL_USERNAME")
     MAIL_PASSWORD = _get_required_env("MAIL_PASSWORD")
+    MAIL_SENDER_NAME = os.environ.get("MAIL_SENDER_NAME", "BookInPieces")
 
     APP_TIMEZONE = os.environ.get("APP_TIMEZONE", "Europe/Rome")
 
