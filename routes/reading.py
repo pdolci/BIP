@@ -79,7 +79,7 @@ def select_book():
             filter_max_hours,
             semantic_book_ids=semantic_book_index.search(search_query) if search_query else None,
         )
-        books_query = Book.query
+        books_query = Book.query.filter_by(is_active=True)
         if filters:
             books_query = books_query.filter(*filters)
         books = books_query.order_by(Book.title.asc()).all()
@@ -430,6 +430,7 @@ def deliver_now(token):
         session["user_id"] = user.id
         session["is_admin"] = user.is_admin
         session["is_content_manager"] = user.is_content_manager
+        session.permanent = True
         session[SESSION_VERSION_KEY] = user.session_version
         session[SESSION_LAST_ACTIVITY_KEY] = utc_now_timestamp()
 

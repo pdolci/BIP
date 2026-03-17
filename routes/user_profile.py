@@ -51,6 +51,7 @@ def profile():
                 flash(_password_requirements_message())
                 return redirect(url_for("app_routes.profile"))
             user.set_password(new_password)
+            user.session_version += 1
 
         user.email = email
         user.telegram_handle = telegram_handle or None
@@ -93,8 +94,6 @@ def delete_account():
     db.session.delete(user)
     db.session.commit()
 
-    session.pop("user_id", None)
-    session.pop("is_admin", None)
-    session.pop("is_content_manager", None)
+    session.clear()
     flash("Il tuo account è stato disiscritto e cancellato completamente.")
     return redirect(url_for("app_routes.index"))

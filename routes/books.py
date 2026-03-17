@@ -1,4 +1,5 @@
 import os
+import uuid
 
 from flask import abort, flash, redirect, render_template, request, send_from_directory, url_for
 from werkzeug.utils import secure_filename
@@ -49,11 +50,12 @@ def upload_book():
     cover_image_file = request.files.get("cover_image_file")
 
     if file and allowed_file(file.filename):
-        filename = secure_filename(file.filename)
+        original_filename = secure_filename(file.filename)
+        extension = original_filename.rsplit(".", 1)[1].lower() if "." in original_filename else ""
+        filename = f"{uuid.uuid4().hex}.{extension}" if extension else uuid.uuid4().hex
         file_path = os.path.join(UPLOAD_FOLDER, filename)
         try:
             file.save(file_path)
-            extension = filename.rsplit(".", 1)[1].lower() if "." in filename else ""
             _sanitize_uploaded_book_file(file_path, extension)
             if not os.path.isfile(file_path):
                 logger.error("❌ File non trovato dopo il salvataggio: %s", file_path)
@@ -176,7 +178,7 @@ def book_cover(book_id):
     if book.cover_image.startswith("covers/"):
         return redirect(url_for("app_routes.uploaded_cover", filename=book.cover_image.split("/", 1)[1]))
 
-    return redirect(book.cover_image)
+    abort(404)
 
 
 @app_routes.route("/admin/book/delete/<int:book_id>", methods=["POST"])
