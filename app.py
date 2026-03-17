@@ -4,8 +4,11 @@ from flask import Flask, flash, redirect, request, url_for
 from limits.storage import storage_from_string
 from werkzeug.middleware.proxy_fix import ProxyFix
 
-from bip_logging import setup_logging
+from bip_logging import get_logger, setup_logging
 from config import Config
+
+logger = get_logger(__name__)
+
 from extensions import csrf, db, limiter, mail, migrate
 from routes import app_routes
 from semantic_search import initialize_semantic_search_index
@@ -63,7 +66,7 @@ def _configure_rate_limiter_storage(app):
             raise RuntimeError(message) from exc
 
         fallback_uri = app.config.get("RATELIMIT_STORAGE_FALLBACK_URI", "memory://")
-        app.logger.warning("%s. Fallback su %s.", message, fallback_uri)
+        logger.warning("%s. Fallback su %s.", message, fallback_uri)
         app.config["RATELIMIT_STORAGE_URI"] = fallback_uri
         return
 
@@ -78,7 +81,7 @@ def _configure_rate_limiter_storage(app):
         raise RuntimeError(message)
 
     fallback_uri = app.config.get("RATELIMIT_STORAGE_FALLBACK_URI", "memory://")
-    app.logger.warning("%s Fallback su %s.", message, fallback_uri)
+    logger.warning("%s Fallback su %s.", message, fallback_uri)
     app.config["RATELIMIT_STORAGE_URI"] = fallback_uri
 
 

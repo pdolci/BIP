@@ -1,4 +1,3 @@
-import logging
 import os
 import random
 import re
@@ -12,6 +11,7 @@ from sqlalchemy import or_
 from werkzeug.security import generate_password_hash
 from werkzeug.utils import secure_filename
 
+from bip_logging import get_logger
 from config import Config
 from email_sender import DELIVERY_TELEGRAM
 from extensions import db
@@ -19,6 +19,8 @@ from html_processing import sanitize_uploaded_html
 from models import Book, DeliveryEvent
 from schedule_utils import FREQ_DAILY, FREQ_EVERY_N_DAYS, FREQ_WEEKDAYS, FREQ_WEEKEND
 from time_utils import utc_naive_to_local_naive, utc_now_timestamp
+
+logger = get_logger(__name__)
 
 UPLOAD_FOLDER = Config.UPLOAD_FOLDER
 COVER_UPLOAD_FOLDER = Config.COVER_UPLOAD_FOLDER
@@ -144,7 +146,7 @@ def _get_random_origin_quote():
         with open(ORIGIN_QUOTES_FILE, "r", encoding="utf-8", errors="replace") as source:
             quotes = [line.strip() for line in source if line.strip()]
     except OSError as error:
-        logging.warning(f"⚠️ Impossibile leggere Origin.txt: {error}")
+        logger.warning("⚠️ Impossibile leggere Origin.txt: %s", error)
         return None
 
     return random.choice(quotes) if quotes else None
@@ -268,7 +270,7 @@ def _count_book_words(schedule):
             db.session.commit()
             return words_count
     except Exception as error:
-        logging.warning(f"⚠️ Impossibile calcolare le parole per schedule {schedule.id}: {error}")
+        logger.warning("⚠️ Impossibile calcolare le parole per schedule %s: %s", schedule.id, error)
         return 0
 
 

@@ -1,5 +1,4 @@
 import json
-import logging
 import math
 import re
 import threading
@@ -7,6 +6,8 @@ from typing import Iterable
 
 from sqlalchemy import inspect
 from sqlalchemy.exc import NoInspectionAvailable, OperationalError
+
+from bip_logging import get_logger
 
 try:
     import numpy as np
@@ -20,6 +21,7 @@ except ImportError:  # pragma: no cover - fallback handled at runtime
 
 EMBEDDING_DIMENSION = 256
 _TOKEN_PATTERN = re.compile(r"\w+", re.UNICODE)
+logger = get_logger(__name__)
 
 
 def _normalize_dense_vector(values):
@@ -106,7 +108,7 @@ class SemanticBookIndex:
             return
         if not self._can_use_faiss():
             if faiss is None:
-                logging.warning("FAISS non disponibile: uso fallback in-memory per la ricerca semantica.")
+                logger.warning("FAISS non disponibile: uso fallback in-memory per la ricerca semantica.")
             return
 
         matrix = np.vstack([self._vectors_by_book_id[book_id] for book_id in self._book_ids]).astype("float32")
@@ -190,7 +192,7 @@ def initialize_semantic_search_index(db_session):
             bind = None
 
     if bind is None:
-        logging.warning(
+        logger.warning(
             "Indicizzazione semantica saltata: nessuna connessione database disponibile durante bootstrap."
         )
         return
@@ -198,14 +200,14 @@ def initialize_semantic_search_index(db_session):
     try:
         inspector = inspect(bind)
     except NoInspectionAvailable:
-        logging.warning(
+        logger.warning(
             "Indicizzazione semantica saltata: bind database non ispezionabile durante bootstrap."
         )
         return
 
     column_names = {column["name"] for column in inspector.get_columns(Book.__tablename__)}
     if "embedding_vector" not in column_names:
-        logging.warning(
+        logger.warning(
             "Indicizzazione semantica saltata: colonna '%s.embedding_vector' non ancora presente.",
             Book.__tablename__,
         )
@@ -214,7 +216,7 @@ def initialize_semantic_search_index(db_session):
     try:
         books = Book.query.all()
     except OperationalError:
-        logging.warning(
+        logger.warning(
             "Indicizzazione semantica saltata: schema database non pronto durante bootstrap.",
             exc_info=True,
         )
