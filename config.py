@@ -115,3 +115,6 @@ class Config:
     PROXY_FIX_X_PREFIX = _get_int_env("PROXY_FIX_X_PREFIX", 0)
 
     STARTUP_GUARDRAILS_ENABLED = _get_bool_env("STARTUP_GUARDRAILS_ENABLED", True)
+
+    # Limite massimo dimensione file caricati (default 10 MB)
+    MAX_CONTENT_LENGTH = _get_int_env("MAX_UPLOAD_SIZE_MB", 10) * 1024 * 1024

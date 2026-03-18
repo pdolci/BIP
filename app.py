@@ -33,6 +33,19 @@ def _register_rate_limit_handlers(app):
 
         return "Too many requests", 429
 
+    @app.errorhandler(413)
+    def handle_request_entity_too_large(_error):
+        flash("Il file caricato supera il limite massimo consentito.")
+        return redirect(request.referrer or url_for("app_routes.index"))
+
+    @app.after_request
+    def set_security_headers(response):
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
+        return response
+
 
 def _validate_startup_prerequisites(app):
     if not app.config.get("STARTUP_GUARDRAILS_ENABLED", True):
