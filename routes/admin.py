@@ -161,6 +161,7 @@ def admin_reset_user_password(user_id):
         return redirect(url_for("app_routes.admin_maintenance"))
 
     user.set_password(new_password)
+    user.session_version += 1
     db.session.commit()
     flash(f"Password aggiornata per {user.email}.")
     return redirect(url_for("app_routes.admin_maintenance"))

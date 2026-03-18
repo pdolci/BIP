@@ -27,6 +27,10 @@ def _register_rate_limit_handlers(app):
             flash("Troppi tentativi di recupero password. Riprova tra qualche minuto.")
             return redirect(url_for("app_routes.forgot_password"))
 
+        if endpoint == "app_routes.register":
+            flash("Troppi tentativi di registrazione. Riprova tra qualche minuto.")
+            return redirect(url_for("app_routes.register"))
+
         return "Too many requests", 429
 
 

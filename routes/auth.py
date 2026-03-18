@@ -24,6 +24,11 @@ from .core import (
 
 
 @app_routes.route("/register", methods=["GET", "POST"])
+@limiter.limit(
+    lambda: _rate_limit_value(Config.REGISTER_RATE_LIMIT_ATTEMPTS, Config.REGISTER_RATE_LIMIT_WINDOW_SECONDS),
+    methods=["POST"],
+    key_func=_client_ip_address,
+)
 def register():
     if request.method == "POST":
         email = (request.form.get("email") or "").strip().lower()
@@ -127,7 +132,7 @@ def confirm_email(token):
 )
 def forgot_password():
     if request.method == "POST":
-        email = (request.form.get("email") or "").strip()
+        email = (request.form.get("email") or "").strip().lower()
         user = User.query.filter_by(email=email).first()
         if user:
             token_payload = {"email": user.email, "password_hash": user.password_hash}

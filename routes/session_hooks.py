@@ -1,6 +1,7 @@
 from flask import flash, redirect, request, session, url_for
 
 from config import Config
+from extensions import db
 from time_utils import utc_now_timestamp
 
 from . import app_routes
@@ -19,7 +20,7 @@ def enforce_session_inactivity_timeout():
     if endpoint in {"app_routes.login", "app_routes.logout", "static"}:
         return None
 
-    user = User.query.get(user_id)
+    user = db.session.get(User, user_id)
     if not user:
         session.clear()
         flash("Sessione non valida. Effettua nuovamente il login.")
