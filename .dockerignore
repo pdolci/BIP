@@ -1,0 +1,44 @@
+# Cache Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Ambienti virtuali
+.venv/
+venv/
+env/
+
+# File sensibili — non includere mai nell'image!
+.env
+*.env
+
+# Git
+.git/
+.gitignore
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Test e CI
+tests/
+.pytest_cache/
+htmlcov/
+.coverage
+
+# Documentazione
+*.md
+*.txt
+!requirements.txt
+
+# Upload utente — montati come volume, non nell'image
+uploads/
+
+# Docker stessa
+Dockerfile
+docker-compose.yml
+entrypoint.sh

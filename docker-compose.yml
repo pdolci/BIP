@@ -1,0 +1,31 @@
+services:
+
+  # MySQL e Redis girano sul server (fuori Docker) — non servono qui.
+  # network_mode: host fa sì che "localhost" nel container = localhost del server,
+  # quindi il tuo .env di produzione funziona senza modifiche.
+
+  # ─── Web App (Gunicorn + Flask) ───────────────────────────────────────────
+  web:
+    build: .
+    restart: unless-stopped
+    network_mode: host          # usa la rete del server → localhost = server
+    environment:
+      ROLE: web
+    env_file: .env              # riusa il tuo .env di produzione invariato
+    volumes:
+      # Bind mount sulla cartella uploads reale del server.
+      # ⚠️  Cambia il percorso a sinistra se uploads/ non è qui
+      - ./uploads:/app/uploads
+
+  # ─── Scheduler Worker ─────────────────────────────────────────────────────
+  scheduler:
+    build: .
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      ROLE: scheduler
+    env_file: .env
+    volumes:
+      - ./uploads:/app/uploads
+    depends_on:
+      - web                     # parte dopo web, così le migrazioni sono già fatte
